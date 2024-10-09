@@ -1,38 +1,37 @@
-import Image from 'next/image';
+// app/page.js
+'use client';
 
-import NearLogo from '/public/near.svg';
-import NextLogo from '/public/next.svg';
+import { useState } from 'react';
 import styles from './app.module.css';
-import { Cards } from '@/components/cards';
 
 export default function Home() {
+  const [aiLps, setAiLps] = useState([]);
+  const [name, setName] = useState('');
+
+  const handleCreate = () => {
+    // Placeholder for backend integration
+    const newAiLp = { id: Date.now(), name };
+    setAiLps([...aiLps, newAiLp]);
+    setName('');
+  };
+
   return (
     <main className={styles.main}>
-      <div className={styles.description}> </div>
-
-      <div className={styles.center}>
-        <Image
-          className={styles.logo}
-          src={NearLogo}
-          alt="NEAR Logo"
-          width={110 * 1.5}
-          height={28 * 1.5}
-          priority
+      <h1>AI LPs</h1>
+      <div className={styles.createSection}>
+        <input
+          type="text"
+          placeholder="Enter AI-LP name"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
         />
-        <h3 className="ms-2 me-3 text-dark"> + </h3>
-        <Image
-          className={styles.logo}
-          src={NextLogo}
-          alt="Next.js Logo"
-          width={300 * .58}
-          height={61 * .58}
-          priority
-        />
+        <button onClick={handleCreate}>Create AI-LP</button>
       </div>
-
-      <div className={styles.grid}>
-        <Cards />
-      </div>
+      <ul className={styles.list}>
+        {aiLps.map((aiLp) => (
+          <li key={aiLp.id}>{aiLp.name}</li>
+        ))}
+      </ul>
     </main>
   );
 }

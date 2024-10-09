@@ -7,7 +7,7 @@ import NearLogo from '/public/near-logo.svg';
 
 export const Navigation = () => {
   const { signedAccountId, wallet } = useContext(NearContext);
-  const [action, setAction] = useState(() => { });
+  const [action, setAction] = useState(() => {});
   const [label, setLabel] = useState('Loading...');
 
   useEffect(() => {
@@ -26,10 +26,24 @@ export const Navigation = () => {
     <nav className="navbar navbar-expand-lg">
       <div className="container-fluid">
         <Link href="/" passHref legacyBehavior>
-          <Image priority src={NearLogo} alt="NEAR" width="30" height="24" className="d-inline-block align-text-top" />
+          <Image
+            priority
+            src={NearLogo}
+            alt="NEAR"
+            width="30"
+            height="24"
+            className="d-inline-block align-text-top"
+          />
         </Link>
-        <div className='navbar-nav pt-1'>
-          <button className="btn btn-secondary" onClick={action} > {label} </button>
+        <div className="navbar-nav ms-3">
+          <Link href="/" className="nav-link">
+            AI LPs
+          </Link>
+        </div>
+        <div className="navbar-nav ms-auto">
+          <button className="btn btn-secondary" onClick={action}>
+            {label}
+          </button>
         </div>
       </div>
     </nav>

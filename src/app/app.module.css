@@ -226,3 +226,33 @@
     transform: rotate(0deg);
   }
 }
+
+/* app/app.module.css */
+.main {
+  padding: 20px;
+}
+
+.createSection {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.createSection input {
+  flex: 1;
+  padding: 8px;
+}
+
+.createSection button {
+  padding: 8px 16px;
+}
+
+.list {
+  list-style-type: none;
+  padding: 0;
+}
+
+.list li {
+  padding: 10px;
+  border-bottom: 1px solid #ccc;
+}
