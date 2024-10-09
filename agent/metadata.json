@@ -1,0 +1,12 @@
+{
+  "name": "prediction-market-assistant",
+  "version": "0.0.1",
+  "description": "Get help choosing your strategy on a prediction market.",
+  "category": "agent",
+  "tags": [
+    "prediction",
+    "market"
+  ],
+  "details": {},
+  "show_entry": true
+}
