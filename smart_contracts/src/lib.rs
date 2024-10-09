@@ -1,10 +1,22 @@
-// Find all our documentation at https://docs.near.org
+// Import necessary modules and crates
 use near_sdk::{
-    env, near_bindgen, AccountId, Balance, BorshDeserialize, BorshSerialize,
-    PanicOnDefault, Promise, json_types::U128,
+    env, near_bindgen, AccountId, BorshDeserialize, BorshSerialize, PanicOnDefault, Promise,
+    json_types::U128, PromiseOrValue,
 };
-use near_sdk::collections::{LookupMap};
-use serde::{Deserialize, Serialize};
+use near_sdk::collections::{LazyOption, LookupMap};
+use near_sdk::serde::{Deserialize, Serialize};
+
+use near_contract_standards::fungible_token::{
+    core::FungibleTokenCore, 
+    metadata::{FungibleTokenMetadata, FungibleTokenMetadataProvider, FT_METADATA_SPEC}, 
+    receiver::FungibleTokenReceiver, 
+    FungibleToken,
+};
+use near_contract_standards::storage_management::{
+    StorageManagement, 
+    StorageBalance, 
+    StorageBalanceBounds,
+};
 
 /// The main contract structure
 #[near_bindgen]
@@ -14,8 +26,10 @@ pub struct Contract {
     iou_receipts: LookupMap<String, IOUReceipt>,
     /// Tracks the next IOU id
     next_iou_id: u64,
-    /// Balances of LP tokens for each account
-    balances: LookupMap<AccountId, Balance>,
+    /// The fungible token instance for LP tokens
+    token: FungibleToken,
+    /// Metadata for the fungible token
+    metadata: LazyOption<FungibleTokenMetadata>,
 }
 
 /// IOUReceipt represents a deposit or withdrawal IOU
@@ -46,12 +60,27 @@ pub enum IOUType {
 impl Contract {
     /// Initializes the contract with default values
     #[init]
-    pub fn new() -> Self {
-        Self {
+    pub fn new(owner_id: AccountId, total_supply: U128) -> Self {
+        assert!(!env::state_exists(), "Already initialized");
+        let metadata = FungibleTokenMetadata {
+            spec: FT_METADATA_SPEC.to_string(),
+            name: "LP Token".to_string(),
+            symbol: "LPT".to_string(),
+            icon: None,
+            reference: None,
+            reference_hash: None,
+            decimals: 24, // NEAR has 24 decimals
+        };
+        let mut this = Self {
             iou_receipts: LookupMap::new(b"i".to_vec()),
             next_iou_id: 0,
-            balances: LookupMap::new(b"b".to_vec()),
-        }
+            token: FungibleToken::new(b"t".to_vec()),
+            metadata: LazyOption::new(b"m".to_vec(), Some(&metadata)),
+        };
+        // Mint initial supply to the owner
+        this.token.internal_register_account(&owner_id);
+        this.token.internal_deposit(&owner_id, total_supply.0);
+        this
     }
 
     /// Users can deposit NEAR to create a deposit IOU
@@ -75,12 +104,8 @@ impl Contract {
     /// Users can redeem LP tokens to create a withdrawal IOU
     pub fn redeem(&mut self, amount: U128) {
         let sender = env::predecessor_account_id();
-        let balance = self.get_balance_internal(&sender);
-        assert!(balance >= amount.0, "Insufficient LP token balance");
-
-        // Burn the LP tokens
-        self.balances.insert(&sender, &(balance - amount.0));
-
+        // Use the fungible token transfer to transfer tokens back to the contract
+        self.token.internal_withdraw(&sender, amount.0);
         // Create Withdrawal IOU receipt
         let iou_id = self.generate_iou_id();
         let iou_receipt = IOUReceipt {
@@ -101,9 +126,6 @@ impl Contract {
 
     /// Fulfills an IOU, marking it as fulfilled and executing the associated action
     pub fn fulfill_iou(&mut self, iou_id: String) {
-        // Whitelist check can be added here in the future
-        // For now, anyone can fulfill an IOU
-
         let mut iou_receipt = self.iou_receipts.get(&iou_id).expect("IOU not found");
         assert!(!iou_receipt.fulfilled, "IOU already fulfilled");
 
@@ -113,16 +135,26 @@ impl Contract {
         match iou_receipt.iou_type {
             IOUType::Deposit => {
                 // Mint LP tokens to recipient
-                let balance = self.get_balance_internal(&iou_receipt.recipient);
-                let new_balance = balance + iou_receipt.amount.0;
-                self.balances.insert(&iou_receipt.recipient, &new_balance);
-                env::log_str(&format!(
-                    "Minted {} LP tokens to {}",
-                    iou_receipt.amount.0, iou_receipt.recipient
-                ));
+                self.token.internal_deposit(&iou_receipt.recipient, iou_receipt.amount.0);
+                // Emit ft_mint event as per NEP-141
+                near_sdk::env::log_str(
+                    &serde_json::json!({
+                        "standard": "nep141",
+                        "version": "1.0.0",
+                        "event": "ft_mint",
+                        "data": [
+                            {
+                                "owner_id": iou_receipt.recipient,
+                                "amount": iou_receipt.amount.0.to_string(),
+                                "memo": "Minted LP tokens",
+                            }
+                        ]
+                    })
+                    .to_string(),
+                );
             }
             IOUType::Withdraw => {
-                // Send NEAR from contract balance to recipient
+                // Transfer NEAR from contract balance to recipient
                 Promise::new(iou_receipt.recipient.clone())
                     .transfer(iou_receipt.amount.0);
                 env::log_str(&format!(
@@ -133,21 +165,78 @@ impl Contract {
         }
     }
 
-    /// Returns the LP token balance for a given account
-    pub fn get_balance(&self, account_id: AccountId) -> U128 {
-        U128(self.get_balance_internal(&account_id))
-    }
-
-    /// Internal method to get the balance without wrapping in U128
-    fn get_balance_internal(&self, account_id: &AccountId) -> Balance {
-        self.balances.get(account_id).unwrap_or(0)
-    }
-
     /// Internal method to generate a unique IOU id
     fn generate_iou_id(&mut self) -> String {
         let id = self.next_iou_id;
         self.next_iou_id += 1;
         id.to_string()
+    }
+}
+
+// Implement NEP-141 methods
+#[near_bindgen]
+impl FungibleTokenCore for Contract {
+    #[payable]
+    fn ft_transfer(
+        &mut self,
+        receiver_id: AccountId,
+        amount: U128,
+        memo: Option<String>,
+    ) {
+        self.token.ft_transfer(receiver_id, amount, memo);
+    }
+
+    #[payable]
+    fn ft_transfer_call(
+        &mut self,
+        receiver_id: AccountId,
+        amount: U128,
+        memo: Option<String>,
+        msg: String,
+    ) -> PromiseOrValue<U128> {
+        self.token.ft_transfer_call(receiver_id, amount, memo, msg)
+    }
+
+    fn ft_total_supply(&self) -> U128 {
+        self.token.ft_total_supply()
+    }
+
+    fn ft_balance_of(&self, account_id: AccountId) -> U128 {
+        self.token.ft_balance_of(account_id)
+    }
+}
+
+// Implement the metadata provider
+#[near_bindgen]
+impl FungibleTokenMetadataProvider for Contract {
+    fn ft_metadata(&self) -> FungibleTokenMetadata {
+        self.metadata.get().unwrap()
+    }
+}
+
+// Implement NEP-145 (Storage Management)
+#[near_bindgen]
+impl StorageManagement for Contract {
+    #[payable]
+    fn storage_deposit(
+        &mut self, 
+        account_id: Option<AccountId>, 
+        registration_only: Option<bool>
+    ) -> StorageBalance {
+        self.token.storage_deposit(account_id, registration_only)
+    }
+
+    #[payable]
+    fn storage_withdraw(&mut self, amount: Option<U128>) -> StorageBalance {
+        self.token.storage_withdraw(amount)
+    }
+
+    fn storage_minimum_balance(&self) -> U128 {
+        self.token.storage_minimum_balance()
+    }
+
+    fn storage_balance_of(&self, account_id: AccountId) -> Option<StorageBalance> {
+        self.token.storage_balance_of(account_id)
     }
 }
 
@@ -183,21 +272,19 @@ mod tests {
         }
     }
 
-    /// Test initializing the contract
     #[test]
     fn test_new() {
         let context = get_context("alice.testnet".parse().unwrap(), 0);
         testing_env!(context);
-        let contract = Contract::new();
-        assert_eq!(contract.next_iou_id, 0);
+        let contract = Contract::new("alice.testnet".parse().unwrap(), U128(1_000_000_000_000_000_000_000_000));
+        assert_eq!(contract.token.ft_balance_of("alice.testnet".parse().unwrap()), U128(1_000_000_000_000_000_000_000_000));
     }
 
-    /// Test depositing NEAR to create a deposit IOU
     #[test]
     fn test_deposit() {
         let context = get_context("alice.testnet".parse().unwrap(), 1_000_000_000_000_000_000_000_000); // 1 NEAR
         testing_env!(context);
-        let mut contract = Contract::new();
+        let mut contract = Contract::new("alice.testnet".parse().unwrap(), U128(1_000_000_000_000_000_000_000_000));
         contract.deposit();
         let ious = contract.list_ious();
         assert_eq!(ious.len(), 1);
@@ -208,14 +295,12 @@ mod tests {
         assert_eq!(iou.iou_type, IOUType::Deposit);
     }
 
-    /// Test redeeming LP tokens to create a withdrawal IOU
     #[test]
     fn test_redeem() {
         let context = get_context("bob.testnet".parse().unwrap(), 0);
         testing_env!(context);
-        let mut contract = Contract::new();
-        // Manually set bob's LP token balance
-        contract.balances.insert(&"bob.testnet".parse().unwrap(), &1_000);
+        let mut contract = Contract::new("bob.testnet".parse().unwrap(), U128(1_000_000_000_000_000_000_000_000));
+        contract.token.internal_deposit(&"bob.testnet".parse().unwrap(), 1_000);
         contract.redeem(U128(500));
         let ious = contract.list_ious();
         assert_eq!(ious.len(), 1);
@@ -224,17 +309,13 @@ mod tests {
         assert_eq!(iou.amount.0, 500);
         assert_eq!(iou.fulfilled, false);
         assert_eq!(iou.iou_type, IOUType::Withdraw);
-        // Check the updated balance
-        let balance = contract.get_balance("bob.testnet".parse().unwrap());
-        assert_eq!(balance.0, 500);
     }
 
-    /// Test fulfilling a deposit IOU
     #[test]
     fn test_fulfill_deposit_iou() {
         let context = get_context("alice.testnet".parse().unwrap(), 1_000_000_000_000_000_000_000_000); // 1 NEAR
         testing_env!(context.clone());
-        let mut contract = Contract::new();
+        let mut contract = Contract::new("alice.testnet".parse().unwrap(), U128(1_000_000_000_000_000_000_000_000));
         contract.deposit();
         let ious = contract.list_ious();
         let iou_id = ious[0].iou_id.clone();
@@ -245,18 +326,15 @@ mod tests {
         assert!(updated_iou.fulfilled);
 
         // Check the LP token balance
-        let balance = contract.get_balance("alice.testnet".parse().unwrap());
-        assert_eq!(balance.0, 1_000_000_000_000_000_000_000_000);
+        assert_eq!(contract.token.ft_balance_of("alice.testnet".parse().unwrap()), U128(1_000_000_000_000_000_000_000_000));
     }
 
-    /// Test fulfilling a withdrawal IOU
     #[test]
     fn test_fulfill_withdraw_iou() {
         let context = get_context("bob.testnet".parse().unwrap(), 0);
         testing_env!(context.clone());
-        let mut contract = Contract::new();
-        // Manually set bob's LP token balance
-        contract.balances.insert(&"bob.testnet".parse().unwrap(), &1_000_000_000_000_000_000_000_000);
+        let mut contract = Contract::new("bob.testnet".parse().unwrap(), U128(1_000_000_000_000_000_000_000_000));
+        contract.token.internal_deposit(&"bob.testnet".parse().unwrap(), 1_000_000_000_000_000_000_000_000);
         contract.redeem(U128(500_000_000_000_000_000_000_000));
         let ious = contract.list_ious();
         let iou_id = ious[0].iou_id.clone();
@@ -265,19 +343,14 @@ mod tests {
         contract.fulfill_iou(iou_id.clone());
         let updated_iou = contract.iou_receipts.get(&iou_id).unwrap();
         assert!(updated_iou.fulfilled);
-
-        // Check the LP token balance
-        let balance = contract.get_balance("bob.testnet".parse().unwrap());
-        assert_eq!(balance.0, 500_000_000_000_000_000_000_000);
     }
 
-    /// Test fulfilling an already fulfilled IOU
     #[test]
     #[should_panic(expected = "IOU already fulfilled")]
     fn test_fulfill_already_fulfilled_iou() {
         let context = get_context("alice.testnet".parse().unwrap(), 1_000_000_000_000_000_000_000_000); // 1 NEAR
         testing_env!(context.clone());
-        let mut contract = Contract::new();
+        let mut contract = Contract::new("alice.testnet".parse().unwrap(), U128(1_000_000_000_000_000_000_000_000));
         contract.deposit();
         let ious = contract.list_ious();
         let iou_id = ious[0].iou_id.clone();
@@ -288,63 +361,56 @@ mod tests {
         contract.fulfill_iou(iou_id);
     }
 
-    /// Test redeeming more LP tokens than available
     #[test]
     #[should_panic(expected = "Insufficient LP token balance")]
     fn test_redeem_insufficient_balance() {
         let context = get_context("bob.testnet".parse().unwrap(), 0);
         testing_env!(context);
-        let mut contract = Contract::new();
-        // Bob has zero LP tokens
+        let mut contract = Contract::new("bob.testnet".parse().unwrap(), U128(1_000_000_000_000_000_000_000_000));
         contract.redeem(U128(500));
     }
 
-    /// Test depositing zero NEAR
     #[test]
     #[should_panic(expected = "Deposit amount must be greater than zero")]
     fn test_deposit_zero_amount() {
         let context = get_context("alice.testnet".parse().unwrap(), 0);
         testing_env!(context);
-        let mut contract = Contract::new();
+        let mut contract = Contract::new("alice.testnet".parse().unwrap(), U128(1_000_000_000_000_000_000_000_000));
         contract.deposit();
     }
 
-    /// Test fulfilling a non-existent IOU
     #[test]
     #[should_panic(expected = "IOU not found")]
     fn test_fulfill_nonexistent_iou() {
         let context = get_context("carol.testnet".parse().unwrap(), 0);
         testing_env!(context);
-        let mut contract = Contract::new();
+        let mut contract = Contract::new("carol.testnet".parse().unwrap(), U128(1_000_000_000_000_000_000_000_000));
         contract.fulfill_iou("nonexistent_iou_id".to_string());
     }
 
-    /// Test listing IOUs when there are none
     #[test]
     fn test_list_ious_empty() {
         let context = get_context("dave.testnet".parse().unwrap(), 0);
         testing_env!(context);
-        let contract = Contract::new();
+        let contract = Contract::new("dave.testnet".parse().unwrap(), U128(1_000_000_000_000_000_000_000_000));
         let ious = contract.list_ious();
         assert_eq!(ious.len(), 0);
     }
 
-    /// Test get_balance for an account with zero balance
     #[test]
     fn test_get_balance_zero() {
         let context = get_context("eve.testnet".parse().unwrap(), 0);
         testing_env!(context);
-        let contract = Contract::new();
-        let balance = contract.get_balance("eve.testnet".parse().unwrap());
+        let contract = Contract::new("eve.testnet".parse().unwrap(), U128(1_000_000_000_000_000_000_000_000));
+        let balance = contract.token.ft_balance_of("eve.testnet".parse().unwrap());
         assert_eq!(balance.0, 0);
     }
 
-    /// Test get_balance after multiple deposits and redemptions
     #[test]
     fn test_get_balance_multiple_operations() {
         let context = get_context("frank.testnet".parse().unwrap(), 1_000_000_000_000_000_000_000_000); // 1 NEAR
         testing_env!(context.clone());
-        let mut contract = Contract::new();
+        let mut contract = Contract::new("frank.testnet".parse().unwrap(), U128(1_000_000_000_000_000_000_000_000));
         // First deposit
         contract.deposit();
         contract.fulfill_iou("0".to_string());
@@ -359,7 +425,7 @@ mod tests {
         contract.fulfill_iou("2".to_string());
 
         // Check balance
-        let balance = contract.get_balance("frank.testnet".parse().unwrap());
+        let balance = contract.token.ft_balance_of("frank.testnet".parse().unwrap());
         assert_eq!(balance.0, 1_500_000_000_000_000_000_000_000); // Remaining LP tokens
     }
 }
