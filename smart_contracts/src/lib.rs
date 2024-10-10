@@ -6,6 +6,7 @@ use near_sdk::{
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::collections::{UnorderedMap};
 use near_sdk::serde::{Deserialize, Serialize};
+use near_token::NearToken;
 
 use near_contract_standards::fungible_token::{
     receiver::FungibleTokenReceiver,
@@ -52,7 +53,7 @@ pub struct IOUReceipt {
     /// LP identifier
     lp_id: String,
     /// Amount involved in the IOU
-    amount: U128,
+    amount: NearToken,
     /// Recipient of the IOU
     recipient: AccountId,
     /// Indicates if the IOU has been fulfilled
@@ -96,33 +97,33 @@ impl Contract {
         self.lps.to_vec()
     }
 
-    ///// Users can deposit NEAR to create a deposit IOU
-    //#[payable]
-    //pub fn deposit(&mut self, lp_id: String) {
-    //    let amount = env::attached_deposit();
-    //    assert!(amount > 0, "Deposit amount must be greater than zero");
-    //    assert!(self.lps.contains_key(&lp_id), "LP not found");
-    //    let sender = env::predecessor_account_id();
-    //    let iou_id = self.generate_iou_id();
-    //    let iou_receipt = IOUReceipt {
-    //        iou_id: iou_id.clone(),
-    //        lp_id: lp_id.clone(),
-    //        amount: U128(amount),
-    //        recipient: sender.clone(),
-    //        fulfilled: false,
-    //        iou_type: IOUType::Deposit,
-    //    };
-    //    self.iou_receipts.insert(&iou_id, &iou_receipt);
-    //    env::log_str(&format!("Deposit IOU created: {:?}", iou_receipt));
-    //}
+    /// Users can deposit NEAR to create a deposit IOU
+    #[payable]
+    pub fn deposit(&mut self, lp_id: String) {
+        let amount = env::attached_deposit();
+        assert!(amount.as_yoctonear() > 0, "Deposit amount must be greater than zero");
+        //assert!(self.lps.contains_key(&lp_id), "LP not found");
+        let sender = env::predecessor_account_id();
+        let iou_id = self.generate_iou_id();
+        let iou_receipt = IOUReceipt {
+            iou_id: iou_id.clone(),
+            lp_id: lp_id.clone(),
+            amount: amount,
+            recipient: sender.clone(),
+            fulfilled: false,
+            iou_type: IOUType::Deposit,
+        };
+        self.iou_receipts.insert(&iou_id, &iou_receipt);
+        env::log_str(&format!("Deposit IOU created: {:?}", iou_receipt));
+    }
 
-    ///// Returns all unresolved IOU receipts
-    //pub fn list_ious(&self) -> Vec<IOUReceipt> {
-    //    self.iou_receipts
-    //        .values()
-    //        .filter(|iou| !iou.fulfilled)
-    //        .collect()
-    //}
+    /// Returns all unresolved IOU receipts
+    pub fn list_ious(&self) -> Vec<IOUReceipt> {
+        self.iou_receipts
+            .values()
+            .filter(|iou| !iou.fulfilled)
+            .collect()
+    }
 
     ///// Fulfills a NEAR IOU (Withdraw IOU)
     //#[payable]
@@ -211,7 +212,7 @@ impl FungibleTokenReceiver for Contract {
         let iou_receipt = IOUReceipt {
             iou_id: iou_id.clone(),
             lp_id: lp_id.clone(),
-            amount,
+            amount: NearToken::from_yoctonear(amount.into()),
             recipient: sender_id.clone(),
             fulfilled: false,
             iou_type: IOUType::Withdraw,
@@ -235,7 +236,7 @@ mod tests {
         predecessor_account_id: AccountId,
         attached_deposit: Balance,
     ) -> VMContext {
-        VMContextBuilder::new().predecessor_account_id(predecessor_account_id).build()
+        VMContextBuilder::new().predecessor_account_id(predecessor_account_id).attached_deposit(NearToken::from_yoctonear(attached_deposit)).build()
     }
 
     #[test]
@@ -257,22 +258,22 @@ mod tests {
         assert_eq!(lps.len(), 2);
     }
 
-    //#[test]
-    //fn test_deposit() {
-    //    let context = get_context("user.testnet".parse().unwrap(), 1_000_000_000_000_000_000_000_000); // 1 NEAR
-    //    testing_env!(context);
-    //    let mut contract = Contract::new();
-    //    contract.add_lp("lp1".to_string(), "lp1.token.testnet".parse().unwrap());
-    //    contract.deposit("lp1".to_string());
-    //    let ious = contract.list_ious();
-    //    assert_eq!(ious.len(), 1);
-    //    let iou = &ious[0];
-    //    assert_eq!(iou.recipient, "user.testnet".parse().unwrap());
-    //    assert_eq!(iou.amount.0, 1_000_000_000_000_000_000_000_000);
-    //    assert_eq!(iou.fulfilled, false);
-    //    assert_eq!(iou.iou_type, IOUType::Deposit);
-    //    assert_eq!(iou.lp_id, "lp1");
-    //}
+    #[test]
+    fn test_deposit() {
+        let context = get_context("user.testnet".parse().unwrap(), 1_000_000_000_000_000_000_000_000); // 1 NEAR
+        testing_env!(context);
+        let mut contract = Contract::new();
+        contract.add_lp("lp1".to_string(), "lp1.token.testnet".parse().unwrap());
+        contract.deposit("lp1".to_string());
+        let ious = contract.list_ious();
+        assert_eq!(ious.len(), 1);
+        let iou = &ious[0];
+        //assert_eq!(iou.recipient, "user.testnet".parse().unwrap());
+        assert_eq!(iou.amount.as_yoctonear(), 1_000_000_000_000_000_000_000_000);
+        assert_eq!(iou.fulfilled, false);
+        assert_eq!(iou.iou_type, IOUType::Deposit);
+        assert_eq!(iou.lp_id, "lp1");
+    }
 
     //#[test]
     //fn test_ft_on_transfer() {
