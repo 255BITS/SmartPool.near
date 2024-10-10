@@ -19,8 +19,6 @@ def main():
 
     env.mark_done()
 
-
-
 def calculate_expected_profit(open_bids, current_probabilities, estimated_future_probabilities):
     moves = []
 
