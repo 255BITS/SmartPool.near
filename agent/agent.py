@@ -1,133 +1,242 @@
+import json
+import urllib.parse
 import urllib.request
-import json as json_lib
+import urllib.error
+from datetime import datetime, timezone
 
-model = "llama-v3p1-70b-instruct"
+def fetch_and_parse_events(slug=None):
+    """
+    Fetches data from the Polymarket API and parses out specific information:
+    - volume
+    - question
+    - notes
+    - startDate
+    - endDate
+    - markets (questions, ids, descriptions, conditionIds, clobTokenIds)
 
-def status_update(json, role, content):
-    pass
+    Returns:
+        A list of dictionaries containing the parsed data.
+    """
+    url = 'https://gamma-api.polymarket.com/events?active=true&closed=false&archived=false'
+    if slug is not None:
+        url += "&slug="+slug
+    headers = {'User-Agent': 'Mozilla/5.0'}
+    request = urllib.request.Request(url, headers=headers)
+    try:
+        with urllib.request.urlopen(request) as response:
+            data = response.read().decode()
+            events = json.loads(data)
+
+            parsed_events = []
+            for event in events:
+                event_info = {
+                    'volume': event.get('volume'),
+                    'question': event.get('title'),
+                    'slug': event.get('slug'),
+                    'notes': event.get('description'),
+                    'startDate': event.get('startDate'),
+                    'endDate': event.get('endDate'),
+                    'markets': []
+                }
+
+                for market in event.get('markets', []):
+                    market_info = {
+                        'question': market.get('question'),
+                        'description': market.get('description'),
+                        'conditionId': market.get('conditionId'),
+                        'negativeMarketId': market.get('negRiskMarketID'),
+                        'clobTokenId': json.loads(market.get('clobTokenIds', [None]))[0]  # Assume first token ID is relevant
+                    }
+                    event_info['markets'].append(market_info)
+
+                parsed_events.append(event_info)
+
+            return parsed_events
+    except urllib.error.HTTPError as e:
+        print(f"HTTP Error: {e.code} - {e.reason} (URL: {url})")
+        return []
+    except Exception as e:
+        print(f"Error fetching data from {url}: {e}")
+        return []
+
+def fetch_market_data(market_id):
+    """
+    Fetches detailed data for a specific market from Polymarket API.
+
+    Args:
+        market_id: The ID of the market to fetch data for.
+
+    Returns:
+        A dictionary containing key information about the market.
+    """
+    url = f'https://clob.polymarket.com/markets/{market_id}'
+    headers = {'User-Agent': 'Mozilla/5.0'}
+    request = urllib.request.Request(url, headers=headers)
+    try:
+        with urllib.request.urlopen(request) as response:
+            data = response.read().decode()
+            market_data = json.loads(data)
+
+            important_data = {
+                'question': market_data.get('question'),
+                'description': market_data.get('description'),
+                'end_date': market_data.get('end_date_iso'),
+                'accepting_orders': market_data.get('accepting_orders'),
+                'minimum_order_size': market_data.get('minimum_order_size'),
+                'minimum_tick_size': market_data.get('minimum_tick_size'),
+                'tokens': [{
+                    'outcome': token.get('outcome'),
+                    'price': token.get('price'),
+                    'winner': token.get('winner')
+                } for token in market_data.get('tokens', [])]
+            }
+
+            return important_data
+    except Exception as e:
+        print(f"Error fetching market data from {url}: {e}")
+        return {}
+
+def fetch_order_book(token_id, top_n=3):
+    """
+    Fetches the order book data for a specific token from Polymarket API.
+
+    Args:
+        token_id: The ID of the token to fetch order book data for.
+        top_n: The number of top bids and asks to return.
+
+    Returns:
+        A dictionary containing the top bids and asks of the order book.
+    """
+    url = f'https://clob.polymarket.com/book?token_id={token_id}'
+    headers = {'User-Agent': 'Mozilla/5.0'}
+    request = urllib.request.Request(url, headers=headers)
+    try:
+        with urllib.request.urlopen(request) as response:
+            data = response.read().decode()
+            order_book_data = json.loads(data)
+
+            # Get the top N bids and asks
+            top_bids = sorted(order_book_data.get('bids', []), key=lambda x: float(x['price']), reverse=True)[:top_n]
+            top_asks = sorted(order_book_data.get('asks', []), key=lambda x: float(x['price']))[:top_n]
+
+            order_book = {
+                'bids': top_bids,
+                'asks': top_asks
+            }
+
+            return order_book
+    except Exception as e:
+        print(f"Error fetching order book data from {url}: {e}")
+        return {}
+
+def format_events(parsed_data):
+    """
+    Helper method to format the parsed data into a readable string.
+
+    Args:
+        parsed_data: The list of parsed event dictionaries.
+
+    Returns:
+        A formatted string containing the parsed data.
+    """
+    parsed_output = []
+    for event in parsed_data:
+        # Calculate hours since startDate and remaining hours until endDate
+        try:
+            start_dt = datetime.fromisoformat(event['startDate'].replace('Z', '+00:00'))
+            end_dt = datetime.fromisoformat(event['endDate'].replace('Z', '+00:00'))
+            now = datetime.now(timezone.utc)
+
+            hours_since_start = int((now - start_dt).total_seconds() / 3600)
+            hours_until_end = int((end_dt - now).total_seconds() / 3600)
+        except Exception as e:
+            print(f"Error parsing dates: {e}")
+            hours_since_start = 'N/A'
+            hours_until_end = 'N/A'
+
+        event_info = (
+            f"Event Question: {event['question']}\n"
+            f"Volume: {event['volume']}\n"
+            f"Notes: {event['notes']}\n"
+            f"Hours Since Start: {hours_since_start} hours\n"
+            f"Hours Until End: {hours_until_end} hours\n"
+            "Markets:\n"
+        )
+
+        markets_info = []
+        for market in event['markets']:
+            market_info = (
+                f"  Market Question: {market['question']}\n"
+                f"  Description: {market['description']}\n"
+            )
+            markets_info.append(market_info)
+
+        event_info += "".join(markets_info) + "-" * 40 + "\n"
+        parsed_output.append(event_info)
+
+    return "".join(parsed_output)
+
+def test_polymarket():
+    # Fetch the parsed data object
+    data = fetch_and_parse_events()
+    # Format the data as a readable string using the helper method
+    if data:
+        formatted_data = format_events([data[0]])
+        print(formatted_data)
+
+        # Fetching market data for the first market in the first event (if available)
+        if data[0]['markets']:
+            first_market = data[0]['markets'][0]
+            first_market_id = first_market['conditionId']
+            clob_token_id = first_market['clobTokenId']
+
+            market_data = fetch_market_data(first_market_id)
+            if market_data:
+                print("Market Data for First Market ID:")
+                print(json.dumps(market_data, indent=4))
+            else:
+                print(f"Market with ID {first_market_id} not found.")
+
+            # Fetching order book data for the first token in the first market (if available)
+            if clob_token_id:
+                order_book_data = fetch_order_book(clob_token_id)
+                if order_book_data:
+                    print("Order Book Data for First Market Token ID:")
+                    print(json.dumps(order_book_data, indent=4))
+                else:
+                    print(f"Order book with Token ID {clob_token_id} not found.")
+    else:
+        print("No market data available.")
+
 
 def main():
     inp = env.list_messages()[-1]["content"]
-    if isinstance(inp, str):
+    slug = inp
+    if "https:" in inp:
+        # Parse the URL to extract the slug
+        parsed_url = urllib.parse.urlparse(inp)
+        slug = parsed_url.path.split('/')[-1]
+
+    # Fetch the parsed data object
+    data = fetch_and_parse_events(slug)
+    if not data:
+        print("No market data available.")
+        return
+
+    if isinstance(data, str):
         try:
-            inp = json_lib.loads(inp)
+            data = json_lib.loads(data)
         except:
             pass
 
-    if not isinstance(inp, dict):
-        inp = {'my_positions': [], "target_market": "https://polymarket.com/event/highest-grossing-movie-in-2024", "question": prompt}
-
+    # Find and print the event matching the given slug
+    matching_events = data
+    if matching_events:
+        formatted_data = format_events(matching_events)
+        print(formatted_data)
+    else:
+        print(f"No event found with slug: {slug}")
     env.mark_done()
 
-def calculate_expected_profit(open_bids, current_probabilities, estimated_future_probabilities):
-    moves = []
-
-    for bid in open_bids:
-        market_id = bid["market_id"]
-        future_probs = estimated_future_probabilities[market_id]
-        current_probs = current_probabilities[market_id]
-
-        for choice in bid["choices"]:
-            option = choice["option"]
-            quantity = choice["quantity"]
-            average_cost = choice["average_cost_usd"]
-            amount_staked = choice["amount_staked"]
-            order_book = choice["order_book"]
-
-            # Calculate potential value based on future probability
-            future_prob = future_probs[option]
-            current_prob = current_probs[option]
-
-            # Expected profit if probabilities shift to estimated future value
-            expected_value = future_prob * quantity * average_cost
-            current_value = current_prob * quantity * average_cost
-            profit = expected_value - current_value
-
-            # Determine if we should buy or sell
-            action = "Hold"
-            if profit > 0:
-                action = "Sell"
-            elif profit < 0:
-                action = "Buy"
-
-            moves.append({
-                "market_id": market_id,
-                "option": option,
-                "action": action,
-                "expected_profit": profit,
-            })
-
-    return sorted(moves, key=lambda x: x["expected_profit"], reverse=True)
-
-def get_best_moves(open_bids, current_probabilities, estimated_future_probabilities, N=5):
-    best_moves = calculate_expected_profit(open_bids, current_probabilities, estimated_future_probabilities)
-    return best_moves[:N]
-
-def display_best_moves(best_moves):
-    for move in best_moves:
-        print(f"Market: {move['market_id']}, Option: {move['option']}, Action: {move['action']}, Expected Profit: {move['expected_profit']}")
-
-def test_calculate_expected_profit():
-    # Example data for your open bids, estimated future probabilities, and current probabilities
-    open_bids = [
-        {
-            "market_id": "oscars_host_2024",
-            "market_title": "Will Will Smith host the Oscars 2024?",
-            "choices": [
-                {
-                    "option": "Yes",
-                    "bid_type": "Yes",
-                    "amount_staked": 100,
-                    "average_cost_usd": 2.0,
-                    "quantity": 10,
-                    "order_book": {
-                        "bids": [
-                            {"price": 0.35, "size": 15},
-                            {"price": 0.40, "size": 25},
-                        ],
-                        "asks": [
-                            {"price": 2.50, "size": 10},
-                            {"price": 2.55, "size": 20},
-                        ],
-                    },
-                },
-                {
-                    "option": "No",
-                    "bid_type": "No",
-                    "amount_staked": 50,
-                    "average_cost_usd": 1.7,
-                    "quantity": 5,
-                    "order_book": {
-                        "bids": [
-                            {"price": 0.70, "size": 10},
-                            {"price": 0.65, "size": 30},
-                        ],
-                        "asks": [
-                            {"price": 0.80, "size": 5},
-                            {"price": 0.85, "size": 15},
-                        ],
-                    },
-                },
-            ],
-        }
-    ]
-
-    estimated_future_probabilities = {
-        "oscars_host_2024": {"Yes": 0.6, "No": 0.4}
-    }
-
-    current_probabilities = {
-        "oscars_host_2024": {"Yes": 0.4, "No": 0.6}
-    }
-
-    # Get the best N moves
-    best_moves = get_best_moves(open_bids, current_probabilities, estimated_future_probabilities)
-
-    # Display the top N moves
-    display_best_moves(best_moves)
-
-# Run the test
-test_calculate_expected_profit()
-
-main()
-
+if __name__ == "__main__":
+    main()
