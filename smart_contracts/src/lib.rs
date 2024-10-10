@@ -1,7 +1,7 @@
 // Import necessary modules and crates
 use near_sdk::{
     env, near_bindgen, AccountId, PanicOnDefault,
-    json_types::U128, PromiseOrValue,
+    json_types::U128, PromiseOrValue, Promise
 };
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::collections::{UnorderedMap};
@@ -125,35 +125,35 @@ impl Contract {
             .collect()
     }
 
-    ///// Fulfills a NEAR IOU (Withdraw IOU)
-    //#[payable]
-    //pub fn fulfill_iou_near(&mut self, iou_id: String) {
-    //    let iou_receipt = self.iou_receipts.get(&iou_id).expect("IOU not found");
-    //    assert!(!iou_receipt.fulfilled, "IOU already fulfilled");
-    //    assert_eq!(
-    //        iou_receipt.iou_type,
-    //        IOUType::Withdraw,
-    //        "IOU type mismatch"
-    //    );
-    //    assert_eq!(
-    //        env::attached_deposit(),
-    //        iou_receipt.amount.0,
-    //        "Attached deposit does not match IOU amount"
-    //    );
+    /// Fulfills a NEAR IOU (Withdraw IOU)
+    #[payable]
+    pub fn fulfill_iou_near(&mut self, iou_id: String) {
+        let iou_receipt = self.iou_receipts.get(&iou_id).expect("IOU not found");
+        assert!(!iou_receipt.fulfilled, "IOU already fulfilled");
+        assert_eq!(
+            iou_receipt.iou_type,
+            IOUType::Withdraw,
+            "IOU type mismatch"
+        );
+        assert_eq!(
+            env::attached_deposit(),
+            iou_receipt.amount,
+            "Attached deposit does not match IOU amount"
+        );
 
-    //    // Mark as fulfilled
-    //    let mut iou_receipt_mut = iou_receipt.clone();
-    //    iou_receipt_mut.fulfilled = true;
-    //    self.iou_receipts.insert(&iou_id, &iou_receipt_mut);
+        // Mark as fulfilled
+        let mut iou_receipt_mut = iou_receipt.clone();
+        iou_receipt_mut.fulfilled = true;
+        self.iou_receipts.insert(&iou_id, &iou_receipt_mut);
 
-    //    // Transfer NEAR to recipient
-    //    Promise::new(iou_receipt.recipient.clone()).transfer(iou_receipt.amount.0);
+        // Transfer NEAR to recipient
+        Promise::new(iou_receipt.recipient.clone()).transfer(iou_receipt.amount);
 
-    //    env::log_str(&format!(
-    //        "Sent {} yoctoNEAR to {}",
-    //        iou_receipt.amount.0, iou_receipt.recipient
-    //    ));
-    //}
+        env::log_str(&format!(
+            "Sent {} yoctoNEAR to {}",
+            iou_receipt.amount, iou_receipt.recipient
+        ));
+    }
 
     ///// Fulfills an LP IOU (Deposit IOU)
     //pub fn fulfill_iou_lp(&mut self, iou_id: String) {
@@ -300,26 +300,26 @@ mod tests {
     //    assert_eq!(iou.lp_id, "lp1");
     //}
 
-    //#[test]
-    //fn test_fulfill_iou_near() {
-    //    let context = get_context("user.testnet".parse().unwrap(), 1_000_000_000_000_000_000_000_000); // 1 NEAR
-    //    testing_env!(context.clone());
-    //    let mut contract = Contract::new();
-    //    contract.add_lp("lp1".to_string(), "lp1.token.testnet".parse().unwrap());
-    //    contract.ft_on_transfer(
-    //        "user.testnet".parse().unwrap(),
-    //        U128(500_000_000_000_000_000_000_000),
-    //        "lp1".to_string(),
-    //    );
-    //    let ious = contract.list_ious();
-    //    let iou_id = ious[0].iou_id.clone();
+    #[test]
+    fn test_fulfill_iou_near() {
+        let context = get_context("user.testnet".parse().unwrap(), 1_000_000_000_000_000_000_000_000); // 1 NEAR
+        testing_env!(context.clone());
+        let mut contract = Contract::new();
+        contract.add_lp("lp1".to_string(), "lp1.token.testnet".parse().unwrap());
+        contract.ft_on_transfer(
+            "user.testnet".parse().unwrap(),
+            U128(500_000_000_000_000_000_000_000),
+            "lp1".to_string(),
+        );
+        let ious = contract.list_ious();
+        let iou_id = ious[0].iou_id.clone();
 
-    //    // Fulfill the IOU
-    //    testing_env!(get_context("owner.testnet".parse().unwrap(), 500_000_000_000_000_000_000_000));
-    //    contract.fulfill_iou_near(iou_id.clone());
-    //    let updated_iou = contract.iou_receipts.get(&iou_id).unwrap();
-    //    assert!(updated_iou.fulfilled);
-    //}
+        // Fulfill the IOU
+        testing_env!(get_context("owner.testnet".parse().unwrap(), 500_000_000_000_000_000_000_000));
+        contract.fulfill_iou_near(iou_id.clone());
+        let updated_iou = contract.iou_receipts.get(&iou_id).unwrap();
+        assert!(updated_iou.fulfilled);
+    }
 
     //#[test]
     //fn test_fulfill_iou_lp() {
