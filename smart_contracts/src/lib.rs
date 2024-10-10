@@ -275,30 +275,30 @@ mod tests {
         assert_eq!(iou.lp_id, "lp1");
     }
 
-    //#[test]
-    //fn test_ft_on_transfer() {
-    //    let context = get_context("lpuser.testnet".parse().unwrap(), 0);
-    //    testing_env!(context);
-    //    let mut contract = Contract::new();
-    //    contract.add_lp("lp1".to_string(), "lp1.token.testnet".parse().unwrap());
-    //    let result = contract.ft_on_transfer(
-    //        "lpuser.testnet".parse().unwrap(),
-    //        U128(500),
-    //        "lp1".to_string(),
-    //    );
-    //    match result {
-    //        PromiseOrValue::Value(amount) => assert_eq!(amount.0, 0),
-    //        _ => panic!("Expected Value"),
-    //    }
-    //    let ious = contract.list_ious();
-    //    assert_eq!(ious.len(), 1);
-    //    let iou = &ious[0];
-    //    assert_eq!(iou.recipient, "lpuser.testnet".parse().unwrap());
-    //    assert_eq!(iou.amount.0, 500);
-    //    assert_eq!(iou.fulfilled, false);
-    //    assert_eq!(iou.iou_type, IOUType::Withdraw);
-    //    assert_eq!(iou.lp_id, "lp1");
-    //}
+    #[test]
+    fn test_ft_on_transfer() {
+        let context = get_context("lpuser.testnet".parse().unwrap(), 0);
+        testing_env!(context);
+        let mut contract = Contract::new();
+        contract.add_lp("lp1".to_string(), "lp1.token.testnet".parse().unwrap());
+        let result = contract.ft_on_transfer(
+            "lpuser.testnet".parse().unwrap(),
+            U128(500),
+            "lp1".to_string(),
+        );
+        match result {
+            PromiseOrValue::Value(amount) => assert_eq!(amount, U128(0)),
+            _ => panic!("Expected Value"),
+        }
+        let ious = contract.list_ious();
+        assert_eq!(ious.len(), 1);
+        let iou = &ious[0];
+        //assert_eq!(iou.recipient, "lpuser.testnet".parse().unwrap());
+        assert_eq!(iou.amount.as_yoctonear(), 500);
+        assert_eq!(iou.fulfilled, false);
+        assert_eq!(iou.iou_type, IOUType::Withdraw);
+        assert_eq!(iou.lp_id, "lp1");
+    }
 
     #[test]
     fn test_fulfill_iou_near() {
