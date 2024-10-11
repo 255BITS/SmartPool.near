@@ -4,6 +4,8 @@ import urllib.request
 import urllib.error
 from datetime import datetime, timezone
 
+model = "llama-v3p1-70b-instruct"
+
 def fetch_and_parse_events(slug=None):
     """
     Fetches data from the Polymarket API and parses out specific information:
@@ -59,75 +61,30 @@ def fetch_and_parse_events(slug=None):
         print(f"Error fetching data from {url}: {e}")
         return []
 
-def fetch_market_data(market_id):
+def calculate_hours(start_date, end_date):
     """
-    Fetches detailed data for a specific market from Polymarket API.
+    Helper method to calculate hours since the start date and hours until the end date.
 
     Args:
-        market_id: The ID of the market to fetch data for.
+        start_date: The start date in ISO format.
+        end_date: The end date in ISO format.
 
     Returns:
-        A dictionary containing key information about the market.
+        A tuple containing hours since start and hours until end.
     """
-    url = f'https://clob.polymarket.com/markets/{market_id}'
-    headers = {'User-Agent': 'Mozilla/5.0'}
-    request = urllib.request.Request(url, headers=headers)
     try:
-        with urllib.request.urlopen(request) as response:
-            data = response.read().decode()
-            market_data = json.loads(data)
+        start_dt = datetime.fromisoformat(start_date.replace('Z', '+00:00'))
+        end_dt = datetime.fromisoformat(end_date.replace('Z', '+00:00'))
+        now = datetime.now(timezone.utc)
 
-            important_data = {
-                'question': market_data.get('question'),
-                'description': market_data.get('description'),
-                'end_date': market_data.get('end_date_iso'),
-                'accepting_orders': market_data.get('accepting_orders'),
-                'minimum_order_size': market_data.get('minimum_order_size'),
-                'minimum_tick_size': market_data.get('minimum_tick_size'),
-                'tokens': [{
-                    'outcome': token.get('outcome'),
-                    'price': token.get('price'),
-                    'winner': token.get('winner')
-                } for token in market_data.get('tokens', [])]
-            }
-
-            return important_data
+        hours_since_start = int((now - start_dt).total_seconds() / 3600)
+        hours_until_end = int((end_dt - now).total_seconds() / 3600)
     except Exception as e:
-        print(f"Error fetching market data from {url}: {e}")
-        return {}
+        print(f"Error parsing dates: {e}")
+        hours_since_start = 'N/A'
+        hours_until_end = 'N/A'
 
-def fetch_order_book(token_id, top_n=3):
-    """
-    Fetches the order book data for a specific token from Polymarket API.
-
-    Args:
-        token_id: The ID of the token to fetch order book data for.
-        top_n: The number of top bids and asks to return.
-
-    Returns:
-        A dictionary containing the top bids and asks of the order book.
-    """
-    url = f'https://clob.polymarket.com/book?token_id={token_id}'
-    headers = {'User-Agent': 'Mozilla/5.0'}
-    request = urllib.request.Request(url, headers=headers)
-    try:
-        with urllib.request.urlopen(request) as response:
-            data = response.read().decode()
-            order_book_data = json.loads(data)
-
-            # Get the top N bids and asks
-            top_bids = sorted(order_book_data.get('bids', []), key=lambda x: float(x['price']), reverse=True)[:top_n]
-            top_asks = sorted(order_book_data.get('asks', []), key=lambda x: float(x['price']))[:top_n]
-
-            order_book = {
-                'bids': top_bids,
-                'asks': top_asks
-            }
-
-            return order_book
-    except Exception as e:
-        print(f"Error fetching order book data from {url}: {e}")
-        return {}
+    return hours_since_start, hours_until_end
 
 def format_events(parsed_data):
     """
@@ -142,17 +99,7 @@ def format_events(parsed_data):
     parsed_output = []
     for event in parsed_data:
         # Calculate hours since startDate and remaining hours until endDate
-        try:
-            start_dt = datetime.fromisoformat(event['startDate'].replace('Z', '+00:00'))
-            end_dt = datetime.fromisoformat(event['endDate'].replace('Z', '+00:00'))
-            now = datetime.now(timezone.utc)
-
-            hours_since_start = int((now - start_dt).total_seconds() / 3600)
-            hours_until_end = int((end_dt - now).total_seconds() / 3600)
-        except Exception as e:
-            print(f"Error parsing dates: {e}")
-            hours_since_start = 'N/A'
-            hours_until_end = 'N/A'
+        hours_since_start, hours_until_end = calculate_hours(event['startDate'], event['endDate'])
 
         event_info = (
             f"Event Question: {event['question']}\n"
@@ -160,54 +107,51 @@ def format_events(parsed_data):
             f"Notes: {event['notes']}\n"
             f"Hours Since Start: {hours_since_start} hours\n"
             f"Hours Until End: {hours_until_end} hours\n"
-            "Markets:\n"
         )
 
-        markets_info = []
-        for market in event['markets']:
-            market_info = (
-                f"  Market Question: {market['question']}\n"
-                f"  Description: {market['description']}\n"
-            )
-            markets_info.append(market_info)
-
-        event_info += "".join(markets_info) + "-" * 40 + "\n"
         parsed_output.append(event_info)
 
     return "".join(parsed_output)
+
+def format_market(event, market):
+    """
+    Formats a single market into a prompt string including event-level information.
+
+    Args:
+        event: A dictionary containing event information.
+        market: A dictionary containing market information.
+
+    Returns:
+        A formatted string for the market, including event-level information.
+    """
+    hours_since_start, hours_until_end = calculate_hours(event['startDate'], event['endDate'])
+
+    return (
+        f"Event Question: {event['question']}\n"
+        f"Volume: {event['volume']}\n"
+        f"Notes: {event['notes']}\n"
+        f"Hours Since Start: {hours_since_start} hours\n"
+        f"Hours Until End: {hours_until_end} hours\n"
+        f"Market Question: {market['question']}\n"
+        f"Description: {market['description']}\n"
+        f"Condition ID: {market['conditionId']}\n"
+        "\nYou are trying to solve the probability of this happening. It can be 0% to 100% probability of 'Yes'. Output format is:\nReasoning: free form reason for probability\nProbability Y%.\n"
+    )
 
 def test_polymarket():
     # Fetch the parsed data object
     data = fetch_and_parse_events()
     # Format the data as a readable string using the helper method
     if data:
-        formatted_data = format_events([data[0]])
-        print(formatted_data)
-
-        # Fetching market data for the first market in the first event (if available)
-        if data[0]['markets']:
-            first_market = data[0]['markets'][0]
-            first_market_id = first_market['conditionId']
-            clob_token_id = first_market['clobTokenId']
-
-            market_data = fetch_market_data(first_market_id)
-            if market_data:
-                print("Market Data for First Market ID:")
-                print(json.dumps(market_data, indent=4))
-            else:
-                print(f"Market with ID {first_market_id} not found.")
-
-            # Fetching order book data for the first token in the first market (if available)
-            if clob_token_id:
-                order_book_data = fetch_order_book(clob_token_id)
-                if order_book_data:
-                    print("Order Book Data for First Market Token ID:")
-                    print(json.dumps(order_book_data, indent=4))
-                else:
-                    print(f"Order book with Token ID {clob_token_id} not found.")
+        # Fetching market data for each market in the first event
+        for market in data[0]['markets']:
+            # Format the market data including event information
+            market_string = format_market(data[0], market)
+            # Call env.completion to generate a prompt for the market
+            response = env.completion(model="gpt-3.5-turbo", prompt=market_string)
+            print(response)
     else:
         print("No market data available.")
-
 
 def main():
     inp = env.list_messages()[-1]["content"]
@@ -225,15 +169,25 @@ def main():
 
     if isinstance(data, str):
         try:
-            data = json_lib.loads(data)
+            data = json.loads(data)
         except:
             pass
 
     # Find and print the event matching the given slug
     matching_events = data
     if matching_events:
-        formatted_data = format_events(matching_events)
-        print(formatted_data)
+
+        # Generate completion for each market in the event
+        for event in matching_events:
+            for market in event['markets']:
+                print("________________________")
+                market_string = format_market(event, market)
+                print(market_string)
+                prompts = [{"role": "system", "content": "You are a predictor."}, {"role": "user", "content": market_string}]
+                response = env.completion(model, prompts)
+                print("___")
+                print(response)
+                print("________________________")
     else:
         print(f"No event found with slug: {slug}")
     env.mark_done()
