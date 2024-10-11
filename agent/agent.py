@@ -135,7 +135,7 @@ def format_market(event, market):
         f"Market Question: {market['question']}\n"
         f"Description: {market['description']}\n"
         f"Condition ID: {market['conditionId']}\n"
-        "\nYou are trying to solve the probability of this happening. It can be 0% to 100% probability of 'Yes'. Output format is:\nReasoning: free form reason for probability\nProbability Y%.\n"
+        "\nYou are trying to solve the probability of this happening. It can be 0% to 100% probability of 'Yes'. Output format is:\nReasoning: free form reason for probability\nProbability: Y%.\n"
     )
 
 def test_polymarket():
@@ -173,13 +173,15 @@ def main():
         except:
             pass
 
+    # Array to store market probabilities
+    market_probabilities = []
+
     # Find and print the event matching the given slug
     matching_events = data
     if matching_events:
-
         # Generate completion for each market in the event
         for event in matching_events:
-            for market in event['markets']:
+            for index, market in enumerate(event['markets']):
                 print("________________________")
                 market_string = format_market(event, market)
                 print(market_string)
@@ -188,6 +190,22 @@ def main():
                 print("___")
                 print(response)
                 print("________________________")
+
+                # Parse the response to extract the probability
+                try:
+                    probability_line = response.split('Probability:')[-1].strip()
+                    try:
+                        probability_value = float(probability_line.split(":")[-1].strip().replace('%', '')) / 100
+                    except ValueError:
+                        probability_value = -1
+                    market_probabilities.append(probability_value)
+                    event['markets'][index]['ai_probability'] = probability_value
+                except Exception as e:
+                    print(f"Error parsing probability from response: {e}")
+
+        # Print the final market probabilities array
+        print("\nMarket Probabilities:")
+        print(json.dumps(market_probabilities, indent=2))
     else:
         print(f"No event found with slug: {slug}")
     env.mark_done()
