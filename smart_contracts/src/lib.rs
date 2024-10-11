@@ -97,6 +97,35 @@ impl Contract {
         self.lps.to_vec()
     }
 
+    // TODO:
+    // * redeem with no storage available on address
+    // * make sure this can't be called directly
+    pub fn redeem_lp_for_near(&mut self, sender_id: AccountId, amount: U128) {
+        let lp_id = "lp_token_id".to_string();  // Replace with actual LP token ID
+
+        // Validate the LP token
+        //assert!(self.lps.contains_key(&lp_id), "LP not found");
+
+        // Generate a unique IOU ID
+        let iou_id = self.generate_iou_id();
+
+        // Create a new IOU for NEAR (withdraw)
+        let iou_receipt = IOUReceipt {
+            iou_id: iou_id.clone(),
+            lp_id: lp_id.clone(),
+            amount: NearToken::from_yoctonear(amount.into()),  // Convert the amount of LP tokens
+            recipient: sender_id.clone(),
+            fulfilled: false,
+            iou_type: IOUType::Withdraw,
+        };
+
+        // Store the IOU in the contract
+        self.iou_receipts.insert(&iou_id, &iou_receipt);
+
+        // Log the IOU creation
+        env::log_str(&format!("Withdraw IOU created: {:?}", iou_receipt));
+    }
+
     /// Users can deposit NEAR to create a deposit IOU
     #[payable]
     pub fn deposit(&mut self, lp_id: String) {
@@ -196,30 +225,29 @@ impl Contract {
     }
 }
 
-// Implement NEP-141 receiver methods
 #[near_bindgen]
 impl FungibleTokenReceiver for Contract {
-    /// Handle incoming LP token transfers
     fn ft_on_transfer(
         &mut self,
         sender_id: AccountId,
         amount: U128,
         msg: String,
     ) -> PromiseOrValue<U128> {
-        let lp_id = msg;
-        //assert!(self.lps.contains_key(&lp_id), "LP not found");
-        let iou_id = self.generate_iou_id();
-        let iou_receipt = IOUReceipt {
-            iou_id: iou_id.clone(),
-            lp_id: lp_id.clone(),
-            amount: NearToken::from_yoctonear(amount.into()),
-            recipient: sender_id.clone(),
-            fulfilled: false,
-            iou_type: IOUType::Withdraw,
-        };
-        self.iou_receipts.insert(&iou_id, &iou_receipt);
-        env::log_str(&format!("Withdraw IOU created: {:?}", iou_receipt));
-        PromiseOrValue::Value(U128(0))
+        // Define the system/burn address
+        let system_address: AccountId = "system".parse().unwrap();  // Replace with actual system/burn address
+
+        // Check if the recipient is the system/burn address
+        if env::predecessor_account_id() == system_address {
+            // This is a redeem action; process the redemption for NEAR IOUs
+            self.redeem_lp_for_near(sender_id, amount);
+
+            // No need to refund any tokens; they have been "burned"
+            PromiseOrValue::Value(U128(0))
+        } else {
+            // Handle other cases (e.g., user-to-user token transfers)
+            env::log_str("Tokens were not sent to the system address, returning them.");
+            PromiseOrValue::Value(amount)  // Returning the tokens back
+        }
     }
 }
 
@@ -282,7 +310,7 @@ mod tests {
         let mut contract = Contract::new();
         contract.add_lp("lp1".to_string(), "lp1.token.testnet".parse().unwrap());
         let result = contract.ft_on_transfer(
-            "lpuser.testnet".parse().unwrap(),
+            "system".parse().unwrap(),
             U128(500),
             "lp1".to_string(),
         );
