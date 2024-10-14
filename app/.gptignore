@@ -1,0 +1,8 @@
+public
+package.json
+jsconfig.json
+*.css
+*.ico
+.next
+node_modules
+package-lock.json

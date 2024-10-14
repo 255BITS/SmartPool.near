@@ -1,7 +1,3 @@
-generator client {
-  provider = "prisma-client-js"
-}
-
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
@@ -11,3 +7,23 @@ model ai_lp {
   id    Int     @id @default(autoincrement())
   name  String
 }
+
+
+generator client {
+  provider        = "prisma-client-js"
+}
+
+
+model Job {
+  id        Int      @id @default(autoincrement())
+  action    String
+  userId    Int
+  amount    Decimal? @db.Decimal(38, 18)
+  percentage Decimal? @db.Decimal(5, 2)
+  receiptuuid String?
+  status    String   @default("pending")
+  details   Json?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
