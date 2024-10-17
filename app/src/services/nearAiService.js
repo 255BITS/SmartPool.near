@@ -1,6 +1,6 @@
 import { createJob } from './jobService.js';
 
-export async function handleBuy({ userId, amount }) {
+export async function handleBuy({ userId, amount }, newJob=createJob) {
   if (amount <= 0) {
     throw new Error('Invalid purchase amount');
   }
@@ -12,11 +12,11 @@ export async function handleBuy({ userId, amount }) {
     amount: amount.toString(),
   };
 
-  const job = await createJob(jobData);
+  const job = await newJob(jobData);
   return { message: 'Buy job added to queue', jobId: job.id };
 }
 
-export async function handleSell({ userId, amount }) {
+export async function handleSell({ userId, amount }, newJob=createJob) {
   if (amount <= 0) {
     throw new Error('Invalid sell amount');
   }
@@ -28,7 +28,7 @@ export async function handleSell({ userId, amount }) {
     amount: amount.toString(),
   };
 
-  const job = await createJob(jobData);
+  const job = await newJob(jobData);
   return { message: 'Sell job added to queue', jobId: job.id };
 }
 

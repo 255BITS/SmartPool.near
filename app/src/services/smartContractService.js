@@ -1,6 +1,6 @@
 import { createJob } from './jobService.js';
 
-export async function handleDeposit({ userId, amountUsdc, receiptuuid }) {
+export async function handleDeposit({ userId, amountUsdc, receiptuuid }, newJob=createJob) {
   if (amountUsdc <= 0) {
     throw new Error('Invalid deposit amount');
   }
@@ -17,11 +17,11 @@ export async function handleDeposit({ userId, amountUsdc, receiptuuid }) {
     receiptuuid,
   };
 
-  const job = await createJob(jobData);
+  const job = await newJob(jobData);
   return { message: 'Deposit job added to queue', jobId: job.id };
 }
 
-export async function handleWithdraw({ userId, percentage, receiptuuid }) {
+export async function handleWithdraw({ userId, percentage, receiptuuid }, newJob=createJob) {
   if (percentage <= 0 || percentage > 100) {
     throw new Error('Invalid percentage value');
   }
@@ -38,7 +38,7 @@ export async function handleWithdraw({ userId, percentage, receiptuuid }) {
     receiptuuid,
   };
 
-  const job = await createJob(jobData);
+  const job = await newJob(jobData);
   return { message: 'Withdraw job added to queue', jobId: job.id };
 }
 

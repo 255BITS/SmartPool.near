@@ -4,10 +4,14 @@ import { PrismaClient } from '@prisma/client';
 import { createJob, getPendingJobs, updateJobStatus } from '../services/jobService.js';
 
 test.beforeEach((t) => {
-  t.context.prisma = sinon.stub(new PrismaClient());
+  t.context.prisma = new PrismaClient();
+  t.context.prisma.job = { create: () => {}, update: () => {}, findMany: () => {} }; // Ensure job model is initialized
+  sinon.stub(t.context.prisma.job, 'create');
+  sinon.stub(t.context.prisma.job, 'update');
+  sinon.stub(t.context.prisma.job, 'findMany');
 });
 
-test.afterEach((t) => {
+test.after((t) => {
   sinon.restore();
 });
 
@@ -25,7 +29,7 @@ test('createJob should create a job and return it', async (t) => {
 
   prisma.job.create.resolves(createdJob);
 
-  const result = await createJob(jobData);
+  const result = await createJob(jobData, prisma);
 
   t.true(prisma.job.create.calledOnceWithExactly({ data: jobData }));
   t.deepEqual(result, createdJob);
@@ -56,7 +60,7 @@ test('getPendingJobs should return all pending jobs', async (t) => {
 
   prisma.job.findMany.resolves(pendingJobs);
 
-  const result = await getPendingJobs();
+  const result = await getPendingJobs(prisma);
 
   t.true(prisma.job.findMany.calledOnceWithExactly({ where: { status: 'pending' } }));
   t.deepEqual(result, pendingJobs);
@@ -81,7 +85,7 @@ test('updateJobStatus should update the job status and details', async (t) => {
 
   prisma.job.update.resolves(updatedJob);
 
-  const result = await updateJobStatus(jobId, status, details);
+  const result = await updateJobStatus(jobId, status, details, prisma);
 
   t.true(
     prisma.job.update.calledOnceWithExactly({
