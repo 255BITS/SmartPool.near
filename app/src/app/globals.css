@@ -93,3 +93,15 @@ a {
     color-scheme: dark;
   }
 }
+
+/* app/globals.css */
+nav a {
+  text-decoration: none;
+  color: blue;
+  margin: 0 5px;
+}
+
+nav a.active {
+  font-weight: bold;
+  text-decoration: underline;
+}

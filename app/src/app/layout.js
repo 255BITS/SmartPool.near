@@ -21,8 +21,20 @@ export default function RootLayout({ children }) {
       <body>
         <NearContext.Provider value={{ wallet, signedAccountId }}>
           <Navigation />
-          {children}
+            <main>{children}</main>
         </NearContext.Provider>
+        <style jsx>{`
+          nav a {
+            text-decoration: none;
+            color: blue;
+            margin: 0 5px;
+          }
+          nav a.active {
+            font-weight: bold;
+            text-decoration: underline;
+          }
+        `}</style>
+
       </body>
     </html>
   );
