@@ -95,16 +95,22 @@ export class Wallet {
     const url = `https://rpc.${this.networkId}.near.org`;
     const provider = new providers.JsonRpcProvider({ url });
 
-    const res = await provider.query({
-      request_type: 'call_function',
-      account_id: contractId,
-      method_name: method,
-      args_base64: Buffer.from(JSON.stringify(args)).toString('base64'),
-      finality: 'optimistic',
-    });
-    return JSON.parse(Buffer.from(res.result).toString());
+    const encodedArgs = Buffer.from(JSON.stringify(args)).toString('base64');
+    
+    try {
+      const res = await provider.query({
+        request_type: 'call_function',
+        account_id: contractId,
+        method_name: method,
+        args_base64: encodedArgs,
+        finality: 'optimistic',
+      });
+      return JSON.parse(Buffer.from(res.result).toString());
+    } catch (error) {
+      console.error("Error querying NEAR view method:", error);
+      throw error;
+    }
   };
-
   /**
    * Makes a call to a contract
    * @param {Object} options - the options for the call
