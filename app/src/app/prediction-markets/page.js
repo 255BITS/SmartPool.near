@@ -107,6 +107,35 @@ export default function PredictionMarkets() {
     }
   };
 
+  const handleWithdraw = async (poolId) => {
+    if (!signedAccountId) {
+      alert('Please sign in to withdraw.');
+      return;
+    }
+
+    const amount = prompt('Enter the amount of tokens:');
+    if (!amount || isNaN(amount) || Number(amount) <= 0) {
+      alert('Please enter a valid amount.');
+      return;
+    }
+
+    try {
+      await wallet.callMethod({
+        contractId: `${poolId}.${CONTRACT_ID}`,
+        method: 'withdraw',
+        args: { "amount": amount },
+        gas: '300000000000000', // 300 TeraGas
+        deposit: "0",
+      });
+
+      alert(`Successful withdraw, ${amount} ${poolId} token.`);
+    } catch (error) {
+      console.error('Error during withdraw:', error);
+      alert('Failed to withdraw token.');
+    }
+  };
+
+
   const handleDeposit = async (poolId) => {
     if (!signedAccountId) {
       alert('Please sign in to deposit.');
@@ -173,6 +202,10 @@ export default function PredictionMarkets() {
                     {storageRegistered[pool] ? 'Deposit' : 'Register to Deposit'}
                   </button>
                 )}
+
+                <button onClick={() => handleWithdraw(pool)}>
+                  Withdraw
+                </button>
                 <h4>IOUs</h4>
                 <pre>{JSON.stringify(ious[pool] || [], null, 2)}</pre>
               </div>
