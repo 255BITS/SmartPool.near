@@ -14,7 +14,7 @@ export default function PredictionMarkets() {
   const [name, setName] = useState('');
   const [ious, setIous] = useState({});
   const [storageRegistered, setStorageRegistered] = useState({});
-
+  const [ftBalanceOf, setFtBalanceOf] = useState({});
 
   useEffect(() => {
     if (!wallet) return;
@@ -48,6 +48,18 @@ export default function PredictionMarkets() {
                 ...prev,
                 [poolId]: !!storageBalance && storageBalance.total !== null,
               }));
+              if(storageBalance.totel !== null) {
+                const ftBalance = await wallet.viewMethod({
+                  contractId: `${poolId}.${CONTRACT_ID}`,
+                  method: 'ft_balance_of',
+                  args: { account_id: signedAccountId },
+                });
+                setFtBalanceOf((prev) => ({
+                  ...prev,
+                  [poolId]: ftBalance,
+                }));
+
+              }
             }
           } catch (error) {
             console.error(`Error fetching data for pool ${poolId}:`, error);
@@ -135,6 +147,26 @@ export default function PredictionMarkets() {
     }
   };
 
+  const handleFulfill = async (poolId, poolIOU) => {
+    if(poolIOU["iou_type"] === "Deposit") { 
+      await wallet.callMethod({
+        contractId: CONTRACT_ID,
+        method: 'fulfill_deposit_iou',
+        args: { "amount": "1000", iou_id: poolIOU["iou_id"], pool_id: poolId },
+        gas: '300000000000000', // 300 TeraGas
+        deposit: "0",
+      });
+    } else {
+      await wallet.callMethod({
+        contractId: CONTRACT_ID,
+        method: 'fulfill_withdraw_iou',
+        args: { "amount": "100000000000000000000000", iou_id: poolIOU["iou_id"], pool_id: poolId },
+        gas: '300000000000000', // 300 TeraGas
+        deposit: "0",
+      });
+    }
+
+  };
 
   const handleDeposit = async (poolId) => {
     if (!signedAccountId) {
@@ -176,9 +208,8 @@ export default function PredictionMarkets() {
 
   return (
     <div>
-      <h1>Prediction Markets</h1>
+      <h1>Prediction Market SmartPools</h1>
       <main className={styles.main}>
-        <h1>SmartPools</h1>
         {signedAccountId ? (
           <div className={styles.createSection}>
             <input
@@ -203,11 +234,21 @@ export default function PredictionMarkets() {
                   </button>
                 )}
 
+                {signedAccountId && storageRegistered[pool] && (<div> {ftBalanceOf[pool]}</div>)}
+
                 <button onClick={() => handleWithdraw(pool)}>
                   Withdraw
                 </button>
                 <h4>IOUs</h4>
-                <pre>{JSON.stringify(ious[pool] || [], null, 2)}</pre>
+                {(ious[pool] || []).map((pool_iou) => (
+                  <>
+                  <pre>{JSON.stringify(pool_iou || [], null, 2)}</pre>
+
+                  <button onClick={() => handleFulfill(pool, pool_iou)}>
+                    Fulfill
+                  </button>
+                  </>
+                ))}
               </div>
             </li>
           ))}
