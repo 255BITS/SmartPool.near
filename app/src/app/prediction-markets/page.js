@@ -15,7 +15,8 @@ export default function PredictionMarkets() {
   const { signedAccountId, wallet } = useContext(NearContext);
   const [smartPools, setSmartPools] = useState([]);
   const [storageRegistered, setStorageRegistered] = useState({});
-  const [ftBalanceOf, setFtBalanceOf] = useState({});
+  const [marketCaps, setMarketCaps] = useState({});
+  const [tokenData, setTokenData] = useState({});
   const [ious, setIous] = useState({});
 
   useEffect(() => {
@@ -29,22 +30,27 @@ export default function PredictionMarkets() {
         });
         setSmartPools(pools);
 
-        // Fetch IOUs and storage balance for each pool
         pools.forEach(async (poolId) => {
           try {
-            const iousResult = await wallet.viewMethod({
-              contractId: `${poolId}.${CONTRACT_ID}`,
-              method: 'list_ious',
-            });
-            setIous((prevIous) => ({ ...prevIous, [poolId]: iousResult }));
+            // Fetch market cap
+            const mcap = await getMcap(poolId);
+            setMarketCaps((prev) => ({ ...prev, [poolId]: mcap }));
 
+            // Fetch token data
+            const tokens = await getTokens(poolId);
+            setTokenData((prev) => ({ ...prev, [poolId]: tokens }));
+
+            // Fetch IOUs
+            const iousData = await getIous(poolId);
+            setIous((prev) => ({ ...prev, [poolId]: iousData }));
+
+            // Fetch storage balance
             if (signedAccountId) {
               const storageBalance = await wallet.viewMethod({
                 contractId: `${poolId}.${CONTRACT_ID}`,
                 method: 'storage_balance_of',
                 args: { account_id: signedAccountId },
               });
-
               setStorageRegistered((prev) => ({
                 ...prev,
                 [poolId]: !!storageBalance && storageBalance.total !== null,
@@ -63,7 +69,7 @@ export default function PredictionMarkets() {
   }, [wallet, signedAccountId]);
 
   const handleCreate = () => {
-    router.push('/prediction-market/create');
+    router.push('/prediction-markets/create');
   };
 
   const handleRegisterStorage = async (poolId) => {
@@ -126,6 +132,59 @@ export default function PredictionMarkets() {
       deposit: '0',
     });
   };
+
+  const getMcap = async (poolId) => {
+    if (signedAccountId) {
+      try {
+      const balance = await wallet.viewMethod({
+        contractId: `${poolId}.${CONTRACT_ID}`,
+        method: 'get_near_balance'
+      });
+      return utils.format.formatNearAmount(balance || "0", 2) + " NEAR";
+      } catch(error) {
+        return "N/A";
+      }
+    } else {
+      return "Loading...";
+    }
+  };
+
+  const getTokens = async (poolId) => {
+    if (signedAccountId) {
+      const ownedTokens = await wallet.viewMethod({
+        contractId: `${poolId}.${CONTRACT_ID}`,
+        method: 'ft_balance_of',
+        args: { account_id: signedAccountId },
+      });
+      const totalTokensIssued = await wallet.viewMethod({
+        contractId: `${poolId}.${CONTRACT_ID}`,
+        method: 'ft_total_supply',
+      });
+      const owned = ownedTokens || 0;
+      const total = totalTokensIssued || 0;
+      const percentage = total > 0 ? ((owned / total) * 100).toFixed(2) : '0.00';
+      if(parseInt(total, 10) === 0) {
+        return "No tokens issued";
+      }
+      return `${owned}/${total} (${percentage}%)`;
+    } else {
+      return "Loading...";
+    }
+  };
+
+  const getIous = async (poolId) => {
+    try {
+      const iousResult = await wallet.viewMethod({
+        contractId: `${poolId}.${CONTRACT_ID}`,
+        method: 'list_ious',
+      });
+      return iousResult;
+    } catch (error) {
+      console.error(`Error fetching IOUs for pool ${poolId}:`, error);
+      return [];
+    }
+  };
+
   return (
     <div>
       <h1>Prediction Market SmartPools</h1>
@@ -135,10 +194,14 @@ export default function PredictionMarkets() {
           <li key={index}>
             <PoolCard
               pool={pool}
-              stats={{ marketCap: 'Mock Market Cap', tokensIssued: 'Mock Tokens Issued' }}
+              stats={{
+                marketCap: marketCaps[pool] || 'Loading...',
+                tokensIssued: tokenData[pool] || 'Loading...',
+                ious: ious[pool] || []
+              }}
               onDeposit={() => handleDeposit(pool)}
               onWithdraw={() => handleWithdraw(pool)}
-              onView={() => router.push(`/prediction-market/${pool}`)}  // Set onView for clickable title
+              onView={() => router.push(`/prediction-markets/${pool}`)}
               onRegisterStorage={() => handleRegisterStorage(pool)}
               isStorageRegistered={storageRegistered[pool]}
             />

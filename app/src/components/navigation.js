@@ -9,7 +9,7 @@ export const Navigation = () => {
       <nav className="nav-links">
         <div className="section">
           Testnet
-          <Link href="/prediction-markets" className={`nav-link ${pathname === '/prediction-markets' ? 'active' : ''}`}>
+          <Link href="/prediction-markets" className={`nav-link ${pathname.includes('/prediction-markets') ? 'active' : ''}`}>
             Prediction Markets
           </Link>
         </div>

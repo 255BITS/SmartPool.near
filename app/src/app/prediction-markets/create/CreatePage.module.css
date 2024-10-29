@@ -1,0 +1,31 @@
+.createPage {
+  padding: 16px;
+  max-width: 500px;
+  margin: 0 auto;
+}
+
+.createPage h1 {
+  text-align: center;
+}
+
+.createPage input {
+  width: 100%;
+  padding: 8px;
+  margin: 12px 0;
+  border-radius: 4px;
+  border: 1px solid #333;
+}
+
+.createPage button {
+  width: 100%;
+  padding: 12px;
+  background-color: #00aaff;
+  border: none;
+  color: white;
+  font-size: 1.1em;
+  cursor: pointer;
+}
+
+.createPage button:hover {
+  background-color: #0077cc;
+}
