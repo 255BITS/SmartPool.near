@@ -20,6 +20,26 @@ class PoolService {
       },
     });
   }
+
+  static getEstimatedValue(holdings) {
+    const NEAR_CONVERSION_USD = 5.0; // TODO: Ideally, fetch this dynamically if time permits.
+    let totalNEAR = holdings.NEAR.amount;
+    
+    // Convert USDC to NEAR equivalent and add to totalNEAR
+    totalNEAR += holdings.USDC.amount / NEAR_CONVERSION_USD;
+
+    // Iterate over other holdings and convert to NEAR
+    for (let asset in holdings) {
+      if (asset !== 'USDC' && asset !== 'NEAR') {
+        totalNEAR += (holdings[asset].amount * holdings[asset].cost_basis) / NEAR_CONVERSION_USD;
+      }
+    }
+
+    // Calculate total USD based on the NEAR equivalent value
+    const totalUSD = (totalNEAR * NEAR_CONVERSION_USD / 1e24).toFixed(2);
+
+    return { totalNEAR, totalUSD };
+  }
 }
 
 export default PoolService;

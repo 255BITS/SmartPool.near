@@ -11,6 +11,7 @@ const CONTRACT_ID = 'smartpool.testnet';
 export default function PoolDetails() {
   const { poolId } = useParams();
   const { wallet } = useContext(NearContext);
+  const [poolEstimatedValue, setPoolEstimatedValue] = useState('Loading...');
   const [poolName, setPoolName] = useState('Loading...');
   const [poolHoldings, setPoolHoldings] = useState({});
   const [participants, setParticipants] = useState('Loading...');
@@ -25,13 +26,31 @@ export default function PoolDetails() {
         if (!response.ok) throw new Error('Failed to fetch pool data');
         const pool = await response.json();
         setPoolName(pool.name);
-        setPoolHoldings(pool.holdings || {});
+        setPoolHoldings(pool.holdings);
+        setPoolEstimatedValue(pool.estimatedValue);
       } catch (error) {
         console.error('Error fetching pool details:', error);
       }
     };
 
     fetchPool();
+  }, [poolId]);
+
+  useEffect(() => {
+    if (!poolId) return;
+
+    const fetchActions = async () => {
+      try {
+        const response = await fetch(`/api/actions?poolName=${poolId}`);
+        if (!response.ok) throw new Error('Failed to fetch actions');
+        const fetchedActions = await response.json();
+        setActions(fetchedActions || []); // Use fetched actions or an empty array
+      } catch (error) {
+        console.error(`Error fetching actions for pool ${poolId}:`, error);
+      }
+    };
+
+    fetchActions();
   }, [poolId]);
 
   useEffect(() => {
@@ -45,14 +64,6 @@ export default function PoolDetails() {
         });
         setPendingSettlements(iousResult || []);
 
-        setActions([
-          { action: 'fulfill_withdraw', by: 'Platform', time: '11:38am' },
-          { action: 'swap', by: 'Platform', time: '11:36am' },
-          { action: 'rebalance', by: 'Platform', time: '11:35am' },
-          { action: 'buy', by: 'NEAR AI', time: '11:32am' },
-          { action: 'sell', by: 'NEAR AI', time: '11:30am' },
-          { action: 'swap', by: 'Platform', time: '11:25am' },
-        ]);
       } catch (error) {
         console.error(`Error fetching details for pool ${poolId}:`, error);
       }
@@ -76,17 +87,26 @@ export default function PoolDetails() {
         
         {/* Pool Info Section */}
         <div className={styles.infoSection}>
-          <h2>Estimated Total</h2>
-          <p><strong>2.3 NEAR</strong></p>
+          <h2>Estimated Value</h2>
+          <p><strong>
+            {poolEstimatedValue && poolEstimatedValue.totalNEAR && (
+              <>
+              {utils.format.formatNearAmount(poolEstimatedValue.totalNEAR, 2)} NEAR(${poolEstimatedValue.totalUSD})
+              </>
+            )}
+          </strong></p>
           <h2>Holdings</h2>
           <p><strong>Positions:</strong></p>
           <ul>
-            {poolHoldings.length > 0 && Object.entries(poolHoldings).map(([key, value]) => (
-              <li key={key}>{key}: {JSON.stringify(value)}</li>
-            )) || "None"}
+            {Object.entries(poolHoldings).map(([key, value]) => {
+              if(key !== "USDC" && key !== "NEAR") {
+                return <li key={key}>{value.name}: {value.amount} @ ${value.cost_basis}</li>
+              }
+              return <></>;
+            })}
           </ul>
-          <p><strong>USDC:</strong> {participants}</p>
-          <p><strong>NEAR:</strong> {participants}</p>
+          <p><strong>USDC:</strong> {(poolHoldings.USDC || {"amount": "Loading..."}).amount}</p>
+          <p><strong>NEAR:</strong> {(poolHoldings.NEAR && utils.format.formatNearAmount(poolHoldings.NEAR.amount, 2)) || "Loading..."}</p>
 
           {/* Pending Settlements Table */}
           <h2>Pending Settlements</h2>
@@ -98,6 +118,7 @@ export default function PoolDetails() {
                   <th>Type</th>
                   <th>Account</th>
                   <th>Amount</th>
+                  <th></th>
                 </tr>
               </thead>
               <tbody>
@@ -107,7 +128,8 @@ export default function PoolDetails() {
                       <td>{settlement.iou_id}</td>
                       <td>{settlement.iou_type}</td>
                       <td>{settlement.account_id}</td>
-                      <td>{(settlement.iou_type === "Withdraw" ? settlement.amount : utils.format.formatNearAmount(settlement.amount))} NEAR</td>
+                      <td>{(settlement.iou_type === "Withdraw" ? settlement.amount : utils.format.formatNearAmount(settlement.amount, 2))} NEAR</td>
+                      <td><button>Fulfill</button></td>
                     </tr>
                   ))
                 ) : (
