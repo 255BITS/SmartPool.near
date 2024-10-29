@@ -31,7 +31,7 @@ class PoolService {
     // Iterate over other holdings and convert to NEAR
     for (let asset in holdings) {
       if (asset !== 'USDC' && asset !== 'NEAR') {
-        totalNEAR += (holdings[asset].amount * holdings[asset].cost_basis) / NEAR_CONVERSION_USD;
+        totalNEAR += (holdings[asset].amount * holdings[asset].cost_basis) / NEAR_CONVERSION_USD * 1e24;
       }
     }
 
