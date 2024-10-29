@@ -10,12 +10,9 @@ generator client {
 model Job {
   id        Int      @id @default(autoincrement())
   action    String
-  userId    Int
-  amount    Decimal? @db.Decimal(38, 18)
-  percentage Decimal? @db.Decimal(5, 2)
-  receiptuuid String?
   status    String   @default("pending")
   details   Json?
+  poolName  String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }

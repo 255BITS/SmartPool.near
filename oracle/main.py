@@ -31,10 +31,7 @@ def update_job_status(job_id, status, details=None):
 def process_job(job):
     job_id = job['id']
     action = job['action']
-    user_id = job['userId']
-    amount = job.get('amount')
-    receiptuuid = job.get('receiptuuid')
-    percentage = job.get('percentage')
+    details = job['details']
 
     try:
         if action == 'BUY':
@@ -53,14 +50,16 @@ def process_job(job):
                 "fees": fees,
             }
             print(f"SELL processed: {usdc_received} USDC received with {fees} fees")
-        elif action == 'DEPOSIT':
-            net_deposit, fees = handle_deposit(user_id, float(amount), receiptuuid)
-            details = {
-                "action": "DEPOSIT",
-                "net_deposit": net_deposit,
-                "fees": fees,
-            }
-            print(f"Deposit processed: {net_deposit} USDC deposited with {fees} fees")
+        elif action == 'fulfillDeposit':
+            #net_deposit, fees = fulfill_deposit(details)
+            #details = {
+            #    "action": "DEPOSIT",
+            #    "net_deposit": net_deposit,
+            #    "fees": fees,
+            #}
+            #print(f"Deposit processed: {net_deposit} USDC deposited with {fees} fees")
+            #
+            print(f"Deposit processed: {id} {details}")
         elif action == 'WITHDRAW':
             net_withdraw, fees = handle_withdraw(user_id, float(percentage), receiptuuid)
             details = {

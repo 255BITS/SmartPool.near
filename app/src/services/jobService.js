@@ -2,10 +2,12 @@ import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
-export async function createJob(jobData, prismaClient = prisma) {
-  const job = await prismaClient.job.create({
-    data: jobData,
-  });
+export async function createJob(action, details, poolName, prismaClient = prisma) {
+  const job = await prismaClient.job.create({data: {
+    action: action,
+    details: details,
+    poolName: poolName
+  }});
   return job;
 }
 

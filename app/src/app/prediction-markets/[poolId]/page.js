@@ -17,9 +17,9 @@ export default function PoolDetails() {
   const [participants, setParticipants] = useState('Loading...');
   const [pendingSettlements, setPendingSettlements] = useState([]);
   const [actions, setActions] = useState([]);
+  const [resolvingIds, setResolvingIds] = useState([]); // Track resolving settlements
 
   useEffect(() => {
-    // Fetch pool data from the backend API based on `poolId`
     const fetchPool = async () => {
       try {
         const response = await fetch(`/api/pool?name=${poolId}`);
@@ -32,7 +32,6 @@ export default function PoolDetails() {
         console.error('Error fetching pool details:', error);
       }
     };
-
     fetchPool();
   }, [poolId]);
 
@@ -44,12 +43,11 @@ export default function PoolDetails() {
         const response = await fetch(`/api/actions?poolName=${poolId}`);
         if (!response.ok) throw new Error('Failed to fetch actions');
         const fetchedActions = await response.json();
-        setActions(fetchedActions || []); // Use fetched actions or an empty array
+        setActions(fetchedActions || []);
       } catch (error) {
         console.error(`Error fetching actions for pool ${poolId}:`, error);
       }
     };
-
     fetchActions();
   }, [poolId]);
 
@@ -63,12 +61,10 @@ export default function PoolDetails() {
           method: 'list_ious',
         });
         setPendingSettlements(iousResult || []);
-
       } catch (error) {
         console.error(`Error fetching details for pool ${poolId}:`, error);
       }
     };
-
     fetchPoolData();
   }, [wallet, poolId]);
 
@@ -78,20 +74,48 @@ export default function PoolDetails() {
     alert('AI has been triggered!');
   };
 
+  async function queueJob(jobType, payload) {
+    try {
+      const response = await fetch('/api/queueJob', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ jobType, payload, poolName: poolId }),
+      });
+      const data = await response.json();
+      if (response.ok) {
+        console.log(data.status);
+      } else {
+        console.error(data.error);
+      }
+    } catch (error) {
+      console.error('Error queuing job:', error);
+    }
+  }
+
+  // Simplified fulfill function with resolving state
+  const fulfill = async (settlement) => {
+    setResolvingIds((prev) => [...prev, settlement.iou_id]); // Mark as resolving
+
+    const jobType = settlement.iou_type === "Deposit" ? 'fulfillDeposit' : 'fulfillWithdraw';
+    await queueJob(jobType, { iou: settlement });
+  };
+
   return (
     <div className={styles.poolDetails}>
       <h1>SmartPool Details: {poolName}</h1>
       
-      {/* Main Content Layout */}
       <div className={styles.mainContent}>
         
-        {/* Pool Info Section */}
         <div className={styles.infoSection}>
+          <h2>Markets</h2>
+            Who will win the Superbowl? [link]
           <h2>Estimated Value</h2>
           <p><strong>
             {poolEstimatedValue && poolEstimatedValue.totalNEAR && (
               <>
-              {utils.format.formatNearAmount(poolEstimatedValue.totalNEAR, 2)} NEAR(${poolEstimatedValue.totalUSD})
+              {utils.format.formatNearAmount(poolEstimatedValue.totalNEAR, 2)} NEAR (${poolEstimatedValue.totalUSD})
               </>
             )}
           </strong></p>
@@ -102,13 +126,12 @@ export default function PoolDetails() {
               if(key !== "USDC" && key !== "NEAR") {
                 return <li key={key}>{value.name}: {value.amount} @ ${value.cost_basis}</li>
               }
-              return <></>;
+              return null;
             })}
           </ul>
-          <p><strong>USDC:</strong> {(poolHoldings.USDC || {"amount": "Loading..."}).amount}</p>
+          <p><strong>USDC:</strong> ${poolHoldings.USDC && poolHoldings.USDC.amount.toFixed(2)}</p>
           <p><strong>NEAR:</strong> {(poolHoldings.NEAR && utils.format.formatNearAmount(poolHoldings.NEAR.amount, 2)) || "Loading..."}</p>
 
-          {/* Pending Settlements Table */}
           <h2>Pending Settlements</h2>
           <div className={styles.tableWrapper}>
             <table className={styles.settlementTable}>
@@ -129,7 +152,13 @@ export default function PoolDetails() {
                       <td>{settlement.iou_type}</td>
                       <td>{settlement.account_id}</td>
                       <td>{(settlement.iou_type === "Withdraw" ? settlement.amount : utils.format.formatNearAmount(settlement.amount, 2))} NEAR</td>
-                      <td><button>Fulfill</button></td>
+                      <td>
+                        {resolvingIds.includes(settlement.iou_id) ? (
+                          <span>Queued...</span>
+                        ) : (
+                          <button onClick={() => fulfill(settlement)}>Fulfill</button>
+                        )}
+                      </td>
                     </tr>
                   ))
                 ) : (
@@ -142,7 +171,6 @@ export default function PoolDetails() {
           </div>
         </div>
 
-        {/* AI Section - Positioned on the Right */}
         <div className={styles.aiSection}>
           <button onClick={handleRunAI} className={styles.runAiButton}>Run AI</button>
           <h2>Oracle Actions</h2>
