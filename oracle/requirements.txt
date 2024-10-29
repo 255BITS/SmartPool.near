@@ -1,0 +1,5 @@
+py-near
+requests
+base58
+loguru
+pydantic
