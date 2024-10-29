@@ -3,16 +3,9 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model ai_lp {
-  id    Int     @id @default(autoincrement())
-  name  String
-}
-
-
 generator client {
   provider        = "prisma-client-js"
 }
-
 
 model Job {
   id        Int      @id @default(autoincrement())
@@ -27,3 +20,17 @@ model Job {
   updatedAt DateTime @updatedAt
 }
 
+model Action {
+  id        Int      @id @default(autoincrement())
+  action    String
+  by        String
+  details   Json?
+  poolName String
+  createdAt DateTime @default(now())
+}
+
+model Pool {
+  id        Int      @id @default(autoincrement())
+  name      String   @unique
+  holdings   Json?
+}

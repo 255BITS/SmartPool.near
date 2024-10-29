@@ -68,5 +68,7 @@ def handle_withdraw(user_id: int, percentage: float, receiptuuid: str):
     update_user_balance(user_id, usdc=new_usdc)
 
     # Record transaction via API
-    create_transaction(user_id, "WITHDRAW", net
+    create_transaction(user_id, "WITHDRAW", net, fees, details={"receiptuuid": receiptuuid})
+
+    return net_withdraw, fees
 
