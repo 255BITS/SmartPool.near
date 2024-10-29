@@ -12,10 +12,27 @@ export default function PoolDetails() {
   const { poolId } = useParams();
   const { wallet } = useContext(NearContext);
   const [poolName, setPoolName] = useState('Loading...');
-  const [poolSize, setPoolSize] = useState('Loading...');
+  const [poolHoldings, setPoolHoldings] = useState({});
   const [participants, setParticipants] = useState('Loading...');
   const [pendingSettlements, setPendingSettlements] = useState([]);
   const [actions, setActions] = useState([]);
+
+  useEffect(() => {
+    // Fetch pool data from the backend API based on `poolId`
+    const fetchPool = async () => {
+      try {
+        const response = await fetch(`/api/pool?name=${poolId}`);
+        if (!response.ok) throw new Error('Failed to fetch pool data');
+        const pool = await response.json();
+        setPoolName(pool.name);
+        setPoolHoldings(pool.holdings || {});
+      } catch (error) {
+        console.error('Error fetching pool details:', error);
+      }
+    };
+
+    fetchPool();
+  }, [poolId]);
 
   useEffect(() => {
     if (!wallet) return;
@@ -52,7 +69,7 @@ export default function PoolDetails() {
 
   return (
     <div className={styles.poolDetails}>
-      <h1>SmartPool Details: {poolId}</h1>
+      <h1>SmartPool Details: {poolName}</h1>
       
       {/* Main Content Layout */}
       <div className={styles.mainContent}>
@@ -62,7 +79,12 @@ export default function PoolDetails() {
           <h2>Estimated Total</h2>
           <p><strong>2.3 NEAR</strong></p>
           <h2>Holdings</h2>
-          <p><strong>Positions:</strong> <ul><li>YES to Broncos 110 @ 0.1</li><li>NO to Cowboys 400 @ 0.9</li></ul></p>
+          <p><strong>Positions:</strong></p>
+          <ul>
+            {poolHoldings.length > 0 && Object.entries(poolHoldings).map(([key, value]) => (
+              <li key={key}>{key}: {JSON.stringify(value)}</li>
+            )) || "None"}
+          </ul>
           <p><strong>USDC:</strong> {participants}</p>
           <p><strong>NEAR:</strong> {participants}</p>
 
