@@ -15,14 +15,15 @@ const PoolCard = ({ pool, stats, onDeposit, onWithdraw, onRegisterStorage, isSto
       <p>Tokens Owned: {stats.tokensOwned} {pool} SP Tokens</p>
       <p>Tokens Issued:
 
-      {stats.ious.length > 0 && (
         <>
         <span className={styles.tokensIssued}>{stats.tokensIssued} {pool} SP Tokens</span>
-        </>)}
+        </>
     </p>
+    {stats.ious.length > 0 && (
       <div class={styles.iousInfo}>
-      {stats.ious.length} pending settlement(s)
+        {stats.ious.length} pending settlement(s)
       </div>
+    )}
 
       <div className={styles.buttonRow}>
         {isStorageRegistered ? (

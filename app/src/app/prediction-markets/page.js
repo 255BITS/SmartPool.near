@@ -126,7 +126,6 @@ export default function PredictionMarkets() {
     }
 
     const amount_str = (Decimal(amount).times(1e24)).toFixed(0);
-    alert(amount_str);
     await wallet.callMethod({
       contractId: `${poolId}.${CONTRACT_ID}`,
       method: 'withdraw',

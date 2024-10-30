@@ -36,13 +36,43 @@ async def swap_near_to_usdc(near_amount, pool_name, owner_account_id, private_ke
 
     return Decimal(near_amount) * USD_CONVERSION_RATE / Decimal(1e24), Decimal(0)
 
-def swap_usdc_to_near(usdc_amount):
+async def swap_usdc_to_near(usdc_amount, pool_name, owner_account_id, private_key, contract_id="smartpool.testnet", network="testnet"):
+
     # Convert usdc_amount to Decimal to ensure precise arithmetic
     usdc_amount_decimal = Decimal(usdc_amount)
     near_amount = (usdc_amount_decimal / Decimal(USD_CONVERSION_RATE)) * Decimal("1e24")
     near_amount_truncated = near_amount.quantize(Decimal("1"), rounding=ROUND_DOWN)
 
-    return near_amount_truncated, 0
+    # Simulate a transfer to the swap service
+    node_url = f"https://rpc.{network}.near.org"
+    
+    # Load the owner's account with private key
+    owner_account = Account(owner_account_id, private_key, rpc_addr=node_url)
+    
+    # Prepare the transaction parameters
+    args = {
+        "pool_id": pool_name,
+        "amount": decimal_to_str(near_amount_truncated)
+    }
+    print("Calling transfer_to_pool", args)
+    
+    while(True):
+        # Call the fulfill_deposit_iou function
+        try:
+            result = await owner_account.function_call(
+                contract_id,
+                "transfer_to_pool",
+                args=args,
+                gas=200_000_000_000_000,
+            )
+            print("Transaction successful:", result)
+            break
+        except Exception as e:
+            print("Transaction failed:", e)
+            time.sleep(2)
+
+
+    return near_amount_truncated, Decimal(0)
 
 def calculate_usdc_total_from_holdings(holdings):
     # Initialize usdc with the amount from "USDC" key, if it exists
@@ -59,7 +89,7 @@ def calculate_usdc_total_from_holdings(holdings):
 
 def rebalance_portfolio(holdings, percentage_pool, portfolio_total):
     print("Would rebalance")
-    return 0.5
+    return Decimal(0.5)
 
 def decimal_to_str(tokens, exp="1"):
     quantized = str(tokens.quantize(Decimal(exp), rounding=ROUND_DOWN))
