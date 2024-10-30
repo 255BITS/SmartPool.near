@@ -12,20 +12,17 @@ const PoolCard = ({ pool, stats, onDeposit, onWithdraw, onRegisterStorage, isSto
     <div className={styles.card}>
       <h2 onClick={onView} style={{ cursor: 'pointer', color: '#0070f3' }}>{pool}</h2>
       <p>Estimated Pool Size: {stats.marketCap}</p>
+      <p>Tokens Owned: {stats.tokensOwned} {pool} SP Tokens</p>
       <p>Tokens Issued:
 
       {stats.ious.length > 0 && (
         <>
-        <span className={styles.tokensIssued}>{stats.tokensIssued}</span>
-        <span 
-          className={styles.iousInfo} 
-        >
-          {stats.ious.length} pending settlement(s)
-        </span>
-        </>
-      ) || (
-      <span className={styles.tokensIssued}>{stats.tokensIssued}</span>
-      )}</p>
+        <span className={styles.tokensIssued}>{stats.tokensIssued} {pool} SP Tokens</span>
+        </>)}
+    </p>
+      <div class={styles.iousInfo}>
+      {stats.ious.length} pending settlement(s)
+      </div>
 
       <div className={styles.buttonRow}>
         {isStorageRegistered ? (

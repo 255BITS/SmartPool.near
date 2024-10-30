@@ -153,7 +153,13 @@ export default function PoolDetails() {
                       <td>{settlement.iou_id}</td>
                       <td>{settlement.iou_type}</td>
                       <td>{settlement.account_id}</td>
-                      <td>{(settlement.iou_type === "Withdraw" ? settlement.amount : utils.format.formatNearAmount(settlement.amount, 2))} NEAR</td>
+
+                      <td>
+                        {(settlement.iou_type === "Withdraw"
+                          ? `${Decimal(settlement.amount).dividedBy(Decimal(1e24)).toFixed(3)} Tokens`
+                          : `${utils.format.formatNearAmount(settlement.amount, 2)} NEAR`
+                        )}
+                      </td>
                       <td>
                         {resolvingIds.includes(settlement.iou_id) ? (
                           <span>Queued...</span>

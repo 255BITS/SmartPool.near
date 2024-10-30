@@ -164,26 +164,45 @@ async def process_job(job):
 
         elif action == 'fulfillWithdraw':
             account_id = details["iou"]["account_id"]
-            tokens = details['iou']['amount']
-            total_tokens = await ft_balance(pool_name, account_id)
+            # Convert the token amount to Decimal
+            tokens_yocto = Decimal(details['iou']['amount'])
+            tokens = tokens_yocto / Decimal(1e24)  # Convert yocto tokens to standard units
+
+            # Step 1: Get total token supply in standard units
+            total_tokens_yocto = await ft_total_supply(pool_name)
+            total_tokens = Decimal(total_tokens_yocto) / Decimal(1e24)
+
+            # Step 2: Calculate the percentage of the pool the user owns
+            percentage_pool = tokens / total_tokens
+
+            # Step 3: Get the current pool holdings and total USDC value
             pool = pool_api.get_pool(pool_name)
-            portfolio_total = calculate_usdc_total_from_holdings(pool["holdings"])
-            print("-- found", tokens, total_tokens)
-            percentage_pool = Decimal(tokens)/Decimal(total_tokens)
-            usdc_received = rebalance_portfolio(pool["holdings"], percentage_pool, portfolio_total)
+            portfolio_total_usdc = calculate_usdc_total_from_holdings(pool["holdings"])
+
+            print("-- found tokens:", tokens, "total tokens:", total_tokens)
+            print("-- percentage of pool to withdraw:", percentage_pool)
+
+            # Step 4: Rebalance the portfolio to get the required USDC
+            # (Assuming rebalance_portfolio returns the USDC amount equivalent to the percentage of the pool)
+            usdc_received = rebalance_portfolio(pool["holdings"], percentage_pool, portfolio_total_usdc)
+
+            # Record the REBALANCE action
             pool_api.record_action(
                 pool_name,
                 "REBALANCE",
                 "Platform",
                 details={
-                    "result_amount": usdc_received,
-                    "fees": 0
+                    "result_amount": decimal_to_str(usdc_received, "0.01"),
+                    "fees": "0"
                 }
             )
 
-            print("Received", usdc_received)
-            near_received, fees = swap_usdc_to_near(usdc_received)
+            print("USDC received after rebalancing:", usdc_received)
 
+            # Step 5: Swap USDC to NEAR
+            near_received, fees = await swap_usdc_to_near(usdc_received, pool_name, owner_account_id, private_key)
+
+            # Record the SWAP action
             pool_api.record_action(
                 pool_name,
                 "SWAP",
@@ -191,16 +210,25 @@ async def process_job(job):
                 details={
                     "from_asset": "USDC",
                     "to_asset": "NEAR",
-                    "amount": usdc_received,
-                    "result_amount": str(near_received),
-                    "fees": fees
+                    "amount": decimal_to_str(usdc_received, "0.01"),
+                    "result_amount": decimal_to_str(near_received),
+                    "fees": decimal_to_str(fees)
                 }
             )
-            print("Sending", near_received, type(near_received));
 
-            near_received_minus_fee = near_received*Decimal("0.95")
+            print("NEAR received from swap:", near_received)
+
+            # Step 6: Deduct the 2% operational fee
+            operational_fee = near_received * Decimal("0.02")
+            near_received_minus_fee = near_received - operational_fee
+
+            # Quantize the NEAR amount (round down to the nearest whole number if necessary)
             near_received_minus_fee_quantized = near_received_minus_fee.quantize(Decimal("1"), rounding=ROUND_DOWN)
+
+            # Step 7: Fulfill the withdrawal by sending NEAR to the user
             await fulfill_withdraw(near_received_minus_fee_quantized, details, pool_name, owner_account_id, private_key)
+
+            # Record the WITHDRAW action
             pool_api.record_action(
                 pool_name,
                 "WITHDRAW",
@@ -208,13 +236,13 @@ async def process_job(job):
                 details={
                     "from_asset": "USDC",
                     "to_asset": "NEAR",
-                    "amount": usdc_received,
-                    "result_amount": str(near_received_minus_fee_quantized),
-                    "fees": fees
+                    "amount": decimal_to_str(usdc_received, "0.01"),
+                    "result_amount": decimal_to_str(near_received_minus_fee_quantized),
+                    "fees": decimal_to_str(operational_fee + fees)
                 }
             )
+
             print(f"Withdraw processed: {job_id} {details}")
-        
         else:
             details = {"error": f"Unknown action: {action}"}
             print(f"Unknown action: {action}")

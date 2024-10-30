@@ -125,10 +125,12 @@ export default function PredictionMarkets() {
       return;
     }
 
+    const amount_str = (Decimal(amount).times(1e24)).toFixed(0);
+    alert(amount_str);
     await wallet.callMethod({
       contractId: `${poolId}.${CONTRACT_ID}`,
       method: 'withdraw',
-      args: { amount: amount },
+      args: { amount: amount_str },
       gas: '300000000000000',
       deposit: '0',
     });
@@ -165,11 +167,11 @@ export default function PredictionMarkets() {
       const total = totalTokensIssued || 0;
       const percentage = total > 0 ? Decimal((owned / total) * 100).toFixed(2) : '0.00';
       if(parseInt(total, 10) === 0) {
-        return "No tokens issued";
+        return ["No tokens issued", "No tokens owned"];
       }
-      return `${owned}/${total} (${percentage}%)`;
+      return [`${(Decimal(owned).dividedBy(Decimal(1e24))).toFixed(3)}`, `${(Decimal(total).dividedBy(Decimal(1e24))).toFixed(3)}`];
     } else {
-      return "Loading...";
+      return ["Loading...", "Loading..."];
     }
   };
 
@@ -197,7 +199,8 @@ export default function PredictionMarkets() {
               pool={pool}
               stats={{
                 marketCap: marketCaps[pool] || 'Loading...',
-                tokensIssued: tokenData[pool] || 'Loading...',
+                tokensIssued: (tokenData[pool] && tokenData[pool][1]) || 'Loading...',
+                tokensOwned: (tokenData[pool] && tokenData[pool][0]) || 'Loading...',
                 ious: ious[pool] || []
               }}
               onDeposit={() => handleDeposit(pool)}
