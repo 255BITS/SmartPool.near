@@ -1,6 +1,8 @@
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 
+import Decimal from 'decimal.js';
+
 export default async function handler(req, res) {
   if (req.method === 'POST') {
     const { poolName, assetName, amount } = req.body;
@@ -21,11 +23,11 @@ export default async function handler(req, res) {
 
       // Parse and update holdings
       const holdings = pool.holdings || {};
-      const currentAsset = holdings[assetName] || { amount: 0, name: assetName };
+      const currentAsset = holdings[assetName] || { amount: Decimal(0), name: assetName };
 
       holdings[assetName] = {
         ...currentAsset,
-        amount: (currentAsset.amount || 0) + amount,
+        amount: (Decimal(currentAsset.amount || 0).plus(Decimal(amount))).toString(),
       };
 
       // Update the pool with new holdings

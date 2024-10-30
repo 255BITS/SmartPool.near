@@ -1,7 +1,8 @@
 import asyncio
+import traceback
 import os
-from core_functions import handle_buy, handle_sell, fulfill_deposit, ft_balance, fulfill_withdraw
-from exchange import swap_near_to_usdc, calculate_usdc_total_from_holdings, rebalance_portfolio, swap_usdc_to_near
+from core_functions import handle_buy, handle_sell, fulfill_deposit, ft_balance, fulfill_withdraw, ft_total_supply
+from exchange import swap_near_to_usdc, calculate_usdc_total_from_holdings, rebalance_portfolio, swap_usdc_to_near, decimal_to_str
 from pool_api_client import PoolApiClient
 from decimal import Decimal, ROUND_DOWN
 
@@ -23,7 +24,6 @@ async def process_job(job):
     details = job['details']
     pool_name = job['poolName']
     owner_account_id = "itchy-harmony.testnet"
-    account_id = details["iou"]["account_id"]
     private_key = os.getenv("OWNER_PRIVATE_KEY", None)
     
     if private_key is None:
@@ -59,8 +59,15 @@ async def process_job(job):
             print(f"NEAR AI run executed")
 
         elif action == 'fulfillDeposit':
-            near_amount = details['iou']['amount']
-            usdc_received, fees = swap_near_to_usdc(near_amount)
+            account_id = details["iou"]["account_id"]
+            near_amount = Decimal(details['iou']['amount'])
+
+            # Step 1: Calculate operational fee and net deposit amount
+            operational_fee = near_amount * Decimal('0.01')  # 1% operational fee
+            near_after_fee = near_amount - operational_fee
+            usdc_received, fees = await swap_near_to_usdc(near_after_fee, pool_name, owner_account_id, private_key)
+
+            # Step 2: Record the SWAP action in the pool’s history
             pool_api.record_action(
                 pool_name,
                 "SWAP",
@@ -68,34 +75,63 @@ async def process_job(job):
                 details={
                     "from_asset": "NEAR",
                     "to_asset": "USDC",
-                    "amount": near_amount,
-                    "result_amount": usdc_received,
-                    "fees": fees
+                    "amount": decimal_to_str(near_after_fee),
+                    "result_amount": decimal_to_str(usdc_received, "0.01"),
+                    "fees": decimal_to_str(fees)
                 }
             )
-            pool_api.add_pool_holdings(pool_name, "USDC", usdc_received)
-            # todo: get token count in pool and award based on new capital
-            # todo: do we ignore the NEAR total here?
-            tokens = 1000
-            await fulfill_deposit(tokens, details, pool_name, owner_account_id, private_key)
+
+            # Step 3: Get current pool USDC holdings BEFORE adding new usdc_received
+            pool = pool_api.get_pool(pool_name)
+            current_usdc_holdings = calculate_usdc_total_from_holdings(pool["holdings"])
+            pool_total_value_before = Decimal(current_usdc_holdings)
+
+            # Step 4: Get current total token supply in standard units
+            tokens_issued_yocto = await ft_total_supply(pool_name)
+            tokens_issued = Decimal(tokens_issued_yocto)/Decimal(1e24)
+
+            print("--", tokens_issued_yocto)
+            # Step 5: Calculate Value per Token (VPT)
+            if int(tokens_issued_yocto) == 0:
+                # First deposit scenario: set initial VPT
+                value_per_token = Decimal('1')  # Initial value per token in USDC
+            else:
+                value_per_token = pool_total_value_before / tokens_issued
+
+            # Step 6: Calculate tokens to issue based on VPT
+            tokens_to_issue = usdc_received / value_per_token
+
+            # Convert tokens_to_issue to yocto units for NEP-141 compliance
+            tokens_to_issue_yocto = tokens_to_issue * Decimal(1e24)
+            print("!!", tokens_to_issue_yocto, usdc_received, value_per_token, pool_total_value_before, tokens_issued)
+
+            # Step 7: Add net deposit amount to pool holdings
+            pool_api.add_pool_holdings(pool_name, "USDC", decimal_to_str(usdc_received, "0.01"))
+
+            # Step 8: Fulfill deposit with calculated tokens in yocto units
+            await fulfill_deposit(tokens_to_issue_yocto, details, pool_name, owner_account_id, private_key)
+
+            # Step 9: Record the DEPOSIT action in the pool’s history
             pool_api.record_action(
                 pool_name,
                 "DEPOSIT",
                 account_id,
                 details={
-                    "from_asset": "USDC",
-                    "to_asset": "NEAR",
-                    "amount": usdc_received,
-                    "result_amount": near_amount,
-                    "fees": fees
+                    "from_asset": "NEAR",
+                    "to_asset": "USDC",
+                    "amount": decimal_to_str(usdc_received, "0.01"),
+                    "result_tokens": decimal_to_str(tokens_to_issue),
+                    "fees": decimal_to_str(operational_fee + fees)
                 }
             )
+
             print(f"Deposit processed: {job_id} {details}")
-        
+
         elif action == 'fulfillWithdraw':
+            account_id = details["iou"]["account_id"]
             tokens = details['iou']['amount']
-            pool = pool_api.get_pool(pool_name)
             total_tokens = await ft_balance(pool_name, account_id)
+            pool = pool_api.get_pool(pool_name)
             portfolio_total = calculate_usdc_total_from_holdings(pool["holdings"])
             print("-- found", tokens, total_tokens)
             percentage_pool = Decimal(tokens)/Decimal(total_tokens)
@@ -152,7 +188,10 @@ async def process_job(job):
         update_job_status(job_id, 'complete', details)
     
     except Exception as e:
-        error_details = {"error": str(e)}
+        error_details = {
+            "error": str(e),
+            "stack_trace": traceback.format_exc()
+        }
         print(f"Failed to process job {job_id}: {error_details}")
 
         # Update job status to 'failed' with error details

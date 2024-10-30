@@ -1,12 +1,12 @@
 # core_functions.py
-from get_user_balance import get_user_balance, update_user_balance, create_transaction
 from py_near.account import Account
+from exchange import decimal_to_str
 import json
 import time
 
 def handle_buy(user_id: int, amount: float):
     """Handles the BUY operation."""
-    user_balance = get_user_balance(user_id)
+    #user_balance = get_user_balance(user_id)
     if user_balance['usdc'] < amount:
         raise ValueError("Insufficient USDC balance")
 
@@ -25,7 +25,7 @@ def handle_buy(user_id: int, amount: float):
 
 def handle_sell(user_id: int, amount: float):
     """Handles the SELL operation."""
-    user_balance = get_user_balance(user_id)
+    #user_balance = get_user_balance(user_id)
     if user_balance['tokens'] < amount:
         raise ValueError("Insufficient token balance")
 
@@ -65,6 +65,28 @@ async def ft_balance(pool_name, account_id, contract_id="smartpool.testnet", net
             time.sleep(2)
     return False
 
+async def ft_total_supply(pool_name, contract_id="smartpool.testnet", network="testnet"):
+    # Initialize NEAR RPC
+    node_url = f"https://rpc.{network}.near.org"
+    
+    # Load the owner's account with private key
+    owner_account = Account(rpc_addr=node_url)
+    
+    args = {}
+    while(True):
+        # Call the fulfill_deposit_iou function
+        try:
+            result = await owner_account.view_function(
+                f"{pool_name}.{contract_id}",
+                "ft_total_supply",
+                args=args,
+            )
+            print("Transaction successful:", result.result)
+            return result.result
+        except Exception as e:
+            print("Transaction failed, retrying:", e)
+            time.sleep(2)
+    return False
 
 async def fulfill_deposit(amount, details, pool_name, owner_account_id, private_key, contract_id="smartpool.testnet", network="testnet"):
     # Initialize NEAR RPC
@@ -80,7 +102,7 @@ async def fulfill_deposit(amount, details, pool_name, owner_account_id, private_
     args = {
         "iou_id": iou_id,
         "pool_id": pool_name,
-        "amount": str(amount)  # Convert to string to match U128 type
+        "amount": decimal_to_str(amount)  # Convert to string to match U128 type
     }
     
     while(True):
@@ -113,7 +135,7 @@ async def fulfill_withdraw(amount, details, pool_name, owner_account_id, private
     args = {
         "iou_id": iou_id,
         "pool_id": pool_name,
-        "amount": str(amount)
+        "amount": decimal_to_str(amount)
     }
     print("CAlling with", args, amount)
     

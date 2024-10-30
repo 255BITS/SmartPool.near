@@ -45,7 +45,7 @@ export default async function handler(req, res) {
   try {
     const pool = await PoolService.getOrCreateByName(name);
     if(!pool.holdings.USDC) {
-      pool.holdings.USDC = {name: "USDC", amount:0};
+      pool.holdings.USDC = {name: "USDC", amount:"0"};
     }
     pool.holdings.NEAR = {name: "NEAR", amount: await getNearBalance(name)};
     pool.estimatedValue = PoolService.getEstimatedValue(pool.holdings);

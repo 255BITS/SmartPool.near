@@ -4,6 +4,7 @@ import { useParams } from 'next/navigation';
 import { useState, useEffect, useContext } from 'react';
 import { NearContext } from '@/wallets/near';
 import styles from '@/app/app.module.css';
+import Decimal from 'decimal.js';
 import { utils } from 'near-api-js';
 
 const CONTRACT_ID = 'smartpool.testnet';
@@ -130,7 +131,7 @@ export default function PoolDetails() {
               return null;
             })}
           </ul>
-          <p><strong>USDC:</strong> ${poolHoldings.USDC && poolHoldings.USDC.amount.toFixed(2)}</p>
+          <p><strong>USDC:</strong> ${poolHoldings.USDC && Decimal(poolHoldings.USDC.amount).toFixed(2)}</p>
           <p><strong>NEAR:</strong> {(poolHoldings.NEAR && utils.format.formatNearAmount(poolHoldings.NEAR.amount, 2)) || "Loading..."}</p>
 
           <h2>Pending Settlements</h2>

@@ -6,6 +6,7 @@ import styles from '../app.module.css';
 import { NearContext } from '@/wallets/near';
 import { utils } from 'near-api-js';
 import PoolCard from '@/components/PoolCard';
+import Decimal from 'decimal.js';
 
 const CONTRACT_ID = 'smartpool.testnet';
 const STORAGE_DEPOSIT_AMOUNT = utils.format.parseNearAmount('0.00125');
@@ -162,7 +163,7 @@ export default function PredictionMarkets() {
       });
       const owned = ownedTokens || 0;
       const total = totalTokensIssued || 0;
-      const percentage = total > 0 ? ((owned / total) * 100).toFixed(2) : '0.00';
+      const percentage = total > 0 ? Decimal((owned / total) * 100).toFixed(2) : '0.00';
       if(parseInt(total, 10) === 0) {
         return "No tokens issued";
       }

@@ -28,6 +28,7 @@
     "@web3modal/wagmi": "^5.1.10",
     "bootstrap": "^5",
     "bootstrap-icons": "^1.11.3",
+    "decimal": "^0.0.2",
     "near-api-js": "^4.0.3",
     "next": "14.2.13",
     "prisma": "^5.20.0",
