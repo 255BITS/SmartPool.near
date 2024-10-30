@@ -16,7 +16,7 @@ export default function handler(req, res) {
   switch (jobType) {
     case 'runAI':
       // Queue up the AI job
-      runAIJob(payload);
+      runAIJob(payload, poolName);
       res.status(200).json({ status: 'Job queued: runAI' });
       break;
 
@@ -38,8 +38,8 @@ export default function handler(req, res) {
   }
 }
 
-function runAIJob(payload) {
-  createJob('runAI', payload);
+function runAIJob(payload, poolName) {
+  createJob('runAI', payload, poolName);
 }
 
 function fulfillDepositJob(payload, poolName) {

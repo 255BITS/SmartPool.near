@@ -28,6 +28,7 @@ model Action {
 
 model Pool {
   id        Int      @id @default(autoincrement())
+  details   Json?
   name      String   @unique
   holdings   Json?
 }

@@ -174,7 +174,7 @@ export default function PoolDetails() {
         </div>
 
         <div className={styles.aiSection}>
-          <button onClick={handleRunAI} className={styles.runAiButton}>Run AI</button>
+          <button onClick={() => handleRunAI()} className={styles.runAiButton}>Run AI</button>
           <h2>Actions</h2>
           <ul className={styles.actions}>
             {actions.map((log, index) => (

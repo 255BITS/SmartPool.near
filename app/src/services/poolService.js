@@ -16,7 +16,8 @@ class PoolService {
     return await prisma.pool.create({
       data: {
         name,
-        holdings: {}, // Default empty JSON object
+        holdings: {},
+        details: {}
       },
     });
   }

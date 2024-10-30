@@ -49,6 +49,9 @@ export default async function handler(req, res) {
     }
     pool.holdings.NEAR = {name: "NEAR", amount: await getNearBalance(name)};
     pool.estimatedValue = PoolService.getEstimatedValue(pool.holdings);
+    if(!pool.details) {
+      pool.details = {};
+    }
     res.status(200).json(pool);
   } catch (error) {
     console.error(error);

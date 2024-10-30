@@ -18,6 +18,12 @@ def update_job_status(job_id, status, details=None):
     """Updates the job status via the Pool API."""
     pool_api.update_job_status(job_id, status, details)
 
+def runAI(pool):
+    # TODO needs current prices
+    print("--", pool)
+    holdings = pool["holdings"]
+    return {"operation": "BUY"}, "http://fake url"
+
 async def process_job(job):
     job_id = job['id']
     action = job['action']
@@ -53,9 +59,38 @@ async def process_job(job):
 
         elif action == 'runAI':
             pool = pool_api.get_pool(pool_name)
-            ai_action, logs = runAI(pool)
-            record_log(logs)
-            execute_buy_or_sell(ai_action)
+            ai_action, log_url = runAI(pool)
+            pool_api.record_action(
+                pool_name,
+                "AI CALL",
+                "Platform",
+                details={
+                    "log_url": log_url,
+                    "ai_action": ai_action
+                }
+            )
+
+            if ai_action["operation"] == "BUY":
+                print("Should BUY here", ai_action)
+                pool_api.record_action(
+                    pool_name,
+                    "BUY",
+                    "NEAR AI",
+                    details={
+                        "ai_action": ai_action,
+                    }
+                )
+            elif ai_action["operation"] == "SELL":
+                print("Should SELL here", ai_action)
+                pool_api.record_action(
+                    pool_name,
+                    "SELL",
+                    "NEAR AI",
+                    details={
+                        "ai_action": ai_action,
+                    }
+                )
+
             print(f"NEAR AI run executed")
 
         elif action == 'fulfillDeposit':
