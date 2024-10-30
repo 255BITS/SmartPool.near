@@ -1,6 +1,9 @@
 import asyncio
+import json
 import traceback
 import os
+import urllib.request
+
 from core_functions import handle_buy, handle_sell, fulfill_deposit, ft_balance, fulfill_withdraw, ft_total_supply
 from exchange import swap_near_to_usdc, calculate_usdc_total_from_holdings, rebalance_portfolio, swap_usdc_to_near, decimal_to_str
 from pool_api_client import PoolApiClient
@@ -8,6 +11,7 @@ from decimal import Decimal, ROUND_DOWN
 
 # Set up PoolApiClient with the AILP URL
 AILP_URL = os.getenv('AILPURL', 'http://localhost:3000')
+NEAR_CONFIG=os.getenv("NEAR_CONFIG", "")
 pool_api = PoolApiClient(AILP_URL)
 
 def fetch_jobs():
@@ -18,10 +22,44 @@ def update_job_status(job_id, status, details=None):
     """Updates the job status via the Pool API."""
     pool_api.update_job_status(job_id, status, details)
 
+def call_near_ai_api(prediction_market_url, liquid_usdc, holdings):
+    url = "https://api.near.ai/v1/agent/runs"
+    print("NEAR_C", NEAR_CONFIG)
+    headers = {
+        'Content-Type': 'application/json',
+        'Authorization': f'Bearer {NEAR_CONFIG}'
+    }
+    new_message = {
+        "prediction_market_url": prediction_market_url,
+        "liquid_usdc": liquid_usdc,
+        "holdings": holdings
+    }
+    new_message = prediction_market_url
+
+    payload = json.dumps({
+        "agent_id": "smartpool.near/prediction-market-assistant/0.0.14",
+        "new_message": new_message,
+        "max_iterations": 1
+    }).encode("utf-8")
+
+    req = urllib.request.Request(url, data=payload, headers=headers)
+    try:
+        print("Calling...")
+        with urllib.request.urlopen(req) as response:
+            result = response.read()
+            print("RESULT")
+            print(result)
+            return json.loads(result)
+    except Exception as e:
+        print(f"Error calling NEAR AI API: {e}")
+        return None
+
 def runAI(pool):
     # TODO needs current prices
     print("--", pool)
     holdings = pool["holdings"]
+    response = call_near_ai_api("https://polymarket.com/event/when-will-gpt-5-be-announced?tid=1729566306341", 0, {})
+    print("___", response)
     return {"operation": "BUY"}, "http://fake url"
 
 async def process_job(job):
