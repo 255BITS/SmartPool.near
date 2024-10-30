@@ -28,33 +28,39 @@ class PoolApiClient:
         except requests.RequestException as e:
             print(f"Failed to update job status for job {job_id}: {e}")
 
-    def record_action(self, action_type, origin, from_asset, to_asset, amount, result_amount, fees):
-        """Records a swap or action with pool holdings."""
+
+    def record_action(self, pool_name, action, by, details=None):
+        """Records an action with pool details."""
         payload = {
-            "action_type": action_type,
-            "origin": origin,
-            "from_asset": from_asset,
-            "to_asset": to_asset,
-            "amount": amount,
-            "result_amount": result_amount,
-            "fees": fees,
+            "action": action,
+            "by": by,
+            "details": details or {},  # Use an empty JSON object if details is None
+            "poolName": pool_name
         }
         try:
             response = requests.post(f"{self.base_url}/api/actions", json=payload)
             response.raise_for_status()
-            print(f"Action recorded: {action_type} from {from_asset} to {to_asset}")
+            print(f"Action recorded: {action} by {by}")
         except requests.RequestException as e:
-            print(f"Failed to record action {action_type}: {e}")
+            print(f"Failed to record action {action}: {e}")
 
-    def add_pool_holdings(self, asset, amount):
-        """Updates the pool holdings for a specified asset."""
+    def get_pool(self, pool_name):
+        try:
+            response = requests.get(f"{self.base_url}/api/pool", params={"name": pool_name})
+            return response.json()
+        except requests.RequestException as e:
+            print(f"Failed to retrieve pool '{pool_name}': {e}")
+
+    def add_pool_holdings(self, pool_name, asset_name, amount):
+        """Updates pool holdings by adding to the specified asset amount."""
         payload = {
-            "asset": asset,
+            "poolName": pool_name,
+            "assetName": asset_name,
             "amount": amount,
         }
         try:
-            response = requests.post(f"{self.base_url}/api/pool/holdings", json=payload)
+            response = requests.post(f"{self.base_url}/api/add_pool_holdings", json=payload)
             response.raise_for_status()
-            print(f"Pool holdings updated: {amount} of {asset}")
+            print(f"Holdings updated: {asset_name} increased by {amount} in {pool_name}")
         except requests.RequestException as e:
-            print(f"Failed to update pool holdings for {asset}: {e}")
+            print(f"Failed to update holdings for {asset_name}: {e}")

@@ -127,7 +127,7 @@ export default function PredictionMarkets() {
     await wallet.callMethod({
       contractId: `${poolId}.${CONTRACT_ID}`,
       method: 'withdraw',
-      args: { amount: utils.format.parseNearAmount(amount) },
+      args: { amount: amount },
       gas: '300000000000000',
       deposit: '0',
     });
