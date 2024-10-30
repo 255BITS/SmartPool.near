@@ -1,12 +1,21 @@
 {
   "name": "prediction-market-assistant",
-  "version": "0.0.1",
-  "description": "Get help choosing your strategy on a prediction market.",
+  "version": "0.0.14",
+  "description": "Get help choosing your strategy on a prediction market, simply input the polymarket link",
   "category": "agent",
   "tags": [
     "prediction",
     "market"
   ],
-  "details": {},
+  "details": {
+    "agent": {
+      "welcome": {
+        "title": "Smartpool prediction market assistant",
+        "description": "Calculate odds on a prediction market with AI. For example:\n\nhttps://polymarket.com/event/when-will-gpt-5-be-announced?tid=1729566306341"
+      },
+      "model": "llama-v3-70b-instruct",
+      "model_max_tokens": 16384
+    }
+  },
   "show_entry": true
 }

@@ -1,10 +1,54 @@
-import json
 import urllib.parse
 import urllib.request
 import urllib.error
+import urllib
 from datetime import datetime, timezone
+import re
+import json
+import random
+from string import Template
+
+MODEL = "llama-v3p1-70b-instruct"
+CLOB_ENDPOINT = 'https://clob.polymarket.com'
+
+def render_template(context):
+    """
+    Load, render, and write the hardcoded template 'template.html' to 'index.html' with the given context.
+
+    Args:
+        context: A dictionary with variables to be used in the template.
+
+    This method loads 'template.html', substitutes the context, and writes the rendered result to 'index.html'.
+    """
+    template_path = "template.html"  # Hardcoded template path
+
+    try:
+        with open(template_path, 'r', encoding='utf-8') as file:
+            template = Template(file.read())
+            rendered_content = template.safe_substitute(context)
+            env.write_file('index.html', rendered_content)
+        print("Rendered template from template.html to index.html successfully.")
+    except FileNotFoundError:
+        print("Template file template.html not found.")
 
 model = "llama-v3p1-70b-instruct"
+
+def format_markets(parsed_data):
+    """
+    Formats the markets into a numbered list of questions with event data.
+
+    Args:
+        parsed_data: The list of parsed event dictionaries.
+
+    Returns:
+        A formatted string containing enumerated market questions.
+    """
+    formatted = []
+    for event in parsed_data:
+        for idx, market in enumerate(event['markets'], 1):
+            formatted.append(f"{idx}. {market['question']}")
+    return "\n".join(formatted)
+
 
 def fetch_and_parse_events(slug=None):
     """
@@ -47,6 +91,7 @@ def fetch_and_parse_events(slug=None):
                         'description': market.get('description'),
                         'conditionId': market.get('conditionId'),
                         'negativeMarketId': market.get('negRiskMarketID'),
+                        'closedTime': market.get('closedTime'),
                         'clobTokenId': json.loads(market.get('clobTokenIds', [None]))[0]  # Assume first token ID is relevant
                     }
                     event_info['markets'].append(market_info)
@@ -86,6 +131,55 @@ def calculate_hours(start_date, end_date):
 
     return hours_since_start, hours_until_end
 
+def format_prices(parsed_data):
+    """
+    Helper method to format the parsed data into a readable string.
+
+    Args:
+        parsed_data: The list of parsed event dictionaries.
+
+    Returns:
+        A formatted string containing the parsed data.
+        List of top 3 walls in [bid, ask] format
+    """
+    walls = []
+    all_token_ids = []
+    token_ids = []
+    for event in parsed_data:
+        for market in event["markets"]:
+            all_token_ids += [[market["question"], market["clobTokenId"]]]
+            if market["closedTime"] is None:
+                token_ids += [market["clobTokenId"]]
+    url = CLOB_ENDPOINT + '/books'
+    headers = {'Content-Type': 'application/json', 'User-Agent': 'Mozilla/5.0'}
+
+    # Prepare the data payload
+    params = [{'token_id': token_id} for token_id in token_ids]
+    data = json.dumps(params).encode('utf-8')
+
+    request = urllib.request.Request(url, data=data, headers=headers, method='POST')
+    idx = 1
+
+    with urllib.request.urlopen(request) as response:
+        response_data = response.read().decode()
+        order_books = json.loads(response_data)
+
+        # Format the order_books data into a readable string
+        formatted_output = []
+        for question, token_id in all_token_ids:
+            order_book = next((order for order in order_books if order.get("asset_id") == token_id), None)
+            s = f"{idx}. {question}"
+            idx+=1
+            if order_book is None:
+                formatted_output.append(f"{s} = Market closed")
+                walls += []
+                continue
+            walls += [[order_book.get('bids', [])[-3:], order_book.get('asks', [])[-3:]]]
+            s += f" = {float(walls[-1][0][-1].get('price'))*100.0}%-{float(walls[-1][1][-1].get('price'))*100.0}%"
+            formatted_output.append(s)
+
+        return "\n".join(formatted_output)
+
 def format_events(parsed_data):
     """
     Helper method to format the parsed data into a readable string.
@@ -100,11 +194,13 @@ def format_events(parsed_data):
     for event in parsed_data:
         # Calculate hours since startDate and remaining hours until endDate
         hours_since_start, hours_until_end = calculate_hours(event['startDate'], event['endDate'])
+        current_day = datetime.now().strftime("%A, %B %d, %Y")
 
         event_info = (
             f"Event Question: {event['question']}\n"
             f"Volume: {event['volume']}\n"
             f"Notes: {event['notes']}\n"
+            f"Current Day: {current_day}\n"
             f"Hours Since Start: {hours_since_start} hours\n"
             f"Hours Until End: {hours_until_end} hours\n"
         )
@@ -125,11 +221,14 @@ def format_market(event, market):
         A formatted string for the market, including event-level information.
     """
     hours_since_start, hours_until_end = calculate_hours(event['startDate'], event['endDate'])
+    current_day = datetime.now().strftime("%A, %B %d, %Y")
+    print(market)
 
     return (
         f"Event Question: {event['question']}\n"
         f"Volume: {event['volume']}\n"
         f"Notes: {event['notes']}\n"
+        f"Current Day: {current_day}\n"
         f"Hours Since Start: {hours_since_start} hours\n"
         f"Hours Until End: {hours_until_end} hours\n"
         f"Market Question: {market['question']}\n"
@@ -138,77 +237,82 @@ def format_market(event, market):
         "\nYou are trying to solve the probability of this happening. It can be 0% to 100% probability of 'Yes'. Output format is:\nReasoning: free form reason for probability\nProbability: Y%.\n"
     )
 
-def test_polymarket():
-    # Fetch the parsed data object
-    data = fetch_and_parse_events()
-    # Format the data as a readable string using the helper method
-    if data:
-        # Fetching market data for each market in the first event
-        for market in data[0]['markets']:
-            # Format the market data including event information
-            market_string = format_market(data[0], market)
-            # Call env.completion to generate a prompt for the market
-            response = env.completion(model="gpt-3.5-turbo", prompt=market_string)
-            print(response)
-    else:
-        print("No market data available.")
-
 def main():
     inp = env.list_messages()[-1]["content"]
     slug = inp
     if "https:" in inp:
-        # Parse the URL to extract the slug
         parsed_url = urllib.parse.urlparse(inp)
         slug = parsed_url.path.split('/')[-1]
 
-    # Fetch the parsed data object
     data = fetch_and_parse_events(slug)
     if not data:
         print("No market data available.")
         return
 
-    if isinstance(data, str):
-        try:
-            data = json.loads(data)
-        except:
-            pass
+    formatted_markets = format_markets(data)
+    formatted_event = format_events(data)
+    formatted_prices = format_prices(data)
+    question_prompt = formatted_event + formatted_markets + "\n\nCurrent market predictions:\n"+formatted_prices+"\n\nPredictions:\n"
+    sys_prompt = """You are predicting an event. You will return the probabilities of each option being true.
 
-    # Array to store market probabilities
-    market_probabilities = []
+Prediction: is parsed and the format is "{index}. {question}: {reasoning} = {prediction}%"
+You MUST follow this format for each entry! Example outputs
+Predictions:
+1. Question: This is where I reason = 100%
+2. Question2: again, This is where I reason = 100%
 
-    # Find and print the event matching the given slug
-    matching_events = data
-    if matching_events:
-        # Generate completion for each market in the event
-        for event in matching_events:
-            for index, market in enumerate(event['markets']):
-                print("________________________")
-                market_string = format_market(event, market)
-                print(market_string)
-                prompts = [{"role": "system", "content": "You are a predictor."}, {"role": "user", "content": market_string}]
-                response = env.completion(model, prompts)
-                print("___")
-                print(response)
-                print("________________________")
+Only write predictions, start with '1.'. Nothing else.
 
-                # Parse the response to extract the probability
-                try:
-                    probability_line = response.split('Probability:')[-1].strip()
-                    try:
-                        probability_value = float(probability_line.split(":")[-1].strip().replace('%', '')) / 100
-                    except ValueError:
-                        probability_value = -1
-                    market_probabilities.append(probability_value)
-                    event['markets'][index]['ai_probability'] = probability_value
-                except Exception as e:
-                    print(f"Error parsing probability from response: {e}")
+Example:
+Event Question: Will the sun rise tomorrow?
+Volume: 10.0
+Notes: This is a market on if the sun will rise. It has every day so far.
 
-        # Print the final market probabilities array
-        print("\nMarket Probabilities:")
-        print(json.dumps(market_probabilities, indent=2))
-    else:
-        print(f"No event found with slug: {slug}")
+1. Sun will rise tomorrow
+2. Sun will not rise tomorrow
+
+Current market predictions:
+1. Sun will rise tomorrow = 98%-100%
+2. Sun will not rise tomorrow = 0%-2%
+
+Predictions:
+1. Sun will rise tomorrow: Earth is spinning causing day cycles = 100.0%
+2. Sun will not rise tomorrow: Earth will not stop spinning = 0.0%
+"""
+
+    print(sys_prompt)
+    print(question_prompt)
+    # Parse the predictions_llm_result to extract probabilities
+    predictions = {}
+    prompts = [{"role": "system", "content": sys_prompt}, {"role": "user", "content": question_prompt}]
+    predictions_llm_result = env.completion(prompts, model=MODEL)
+
+    lines = predictions_llm_result.splitlines()
+    idx = 0
+    for line in lines:
+        if line.strip():
+            idx += 1
+            market = data[0]['markets'][idx - 1]
+            match = re.match(r'(.*?):\s*(.*?)\s*=\s*([\d\.]+)%', line)
+
+            if match:
+                question = match.group(1).strip()
+                reasoning = match.group(2).strip()
+                probability = float(match.group(3))/100.0
+                predictions[idx]=[question,reasoning,probability]
+            else:
+                print(f"Could not parse line: {line}")
+
+    print("From prompts", prompts)
+    print("____")
+    print(predictions_llm_result)
+    print("PREDICTIONS")
+    print(predictions)
+    environment_id = globals()['env'].env_vars.get("environmentId", globals()['env'].env_vars.get("environment_id", "")) # this should be set by the app runner
+    agent_id = "smartpool.near/prediction-market-assistant/0.0.7"
+    render_template({'sys_prompt': sys_prompt, 'prompt': question_prompt, 'predictions':json.dumps(predictions, indent=4),'environment_id':environment_id, 'agent_id':agent_id})
     env.mark_done()
 
 if __name__ == "__main__":
+    print("calling main")
     main()
