@@ -2,6 +2,7 @@
 from get_user_balance import get_user_balance, update_user_balance, create_transaction
 from py_near.account import Account
 import json
+import time
 
 def handle_buy(user_id: int, amount: float):
     """Handles the BUY operation."""
@@ -49,17 +50,19 @@ async def ft_balance(pool_name, account_id, contract_id="smartpool.testnet", net
     owner_account = Account(rpc_addr=node_url)
     
     args = { "account_id": account_id }
-    # Call the fulfill_deposit_iou function
-    try:
-        result = await owner_account.view_function(
-            f"{pool_name}.{contract_id}",
-            "ft_balance_of",
-            args=args,
-        )
-        print("Transaction successful:", result.result)
-        return result.result
-    except Exception as e:
-        print("Transaction failed:", e)
+    while(True):
+        # Call the fulfill_deposit_iou function
+        try:
+            result = await owner_account.view_function(
+                f"{pool_name}.{contract_id}",
+                "ft_balance_of",
+                args=args,
+            )
+            print("Transaction successful:", result.result)
+            return result.result
+        except Exception as e:
+            print("Transaction failed, retrying:", e)
+            time.sleep(2)
     return False
 
 
@@ -80,18 +83,20 @@ async def fulfill_deposit(amount, details, pool_name, owner_account_id, private_
         "amount": str(amount)  # Convert to string to match U128 type
     }
     
-    # Call the fulfill_deposit_iou function
-    try:
-        result = await owner_account.function_call(
-            contract_id,
-            "fulfill_deposit_iou",
-            args=args,
-            gas=200_000_000_000_000,
-        )
-        print("Transaction successful:", result)
-        return True
-    except Exception as e:
-        print("Transaction failed:", e)
+    while(True):
+        # Call the fulfill_deposit_iou function
+        try:
+            result = await owner_account.function_call(
+                contract_id,
+                "fulfill_deposit_iou",
+                args=args,
+                gas=200_000_000_000_000,
+            )
+            print("Transaction successful:", result)
+            return True
+        except Exception as e:
+            print("Transaction failed:", e)
+            time.sleep(2)
     return False
 
 async def fulfill_withdraw(amount, details, pool_name, owner_account_id, private_key, contract_id="smartpool.testnet", network="testnet"):
@@ -113,15 +118,17 @@ async def fulfill_withdraw(amount, details, pool_name, owner_account_id, private
     print("CAlling with", args, amount)
     
     # Call the fulfill_deposit_iou function
-    try:
-        result = await owner_account.function_call(
-            contract_id,
-            "fulfill_withdraw_iou",
-            args=args,
-            gas=200_000_000_000_000,
-        )
-        print("Transaction successful:", result)
-        return True
-    except Exception as e:
-        print("Transaction failed:", e)
+    while(True):
+        try:
+            result = await owner_account.function_call(
+                contract_id,
+                "fulfill_withdraw_iou",
+                args=args,
+                gas=200_000_000_000_000,
+            )
+            print("Transaction successful:", result)
+            return True
+        except Exception as e:
+            print("Transaction failed:", e)
+            time.sleep(2)
     return False

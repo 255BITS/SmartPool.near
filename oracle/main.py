@@ -23,6 +23,7 @@ async def process_job(job):
     details = job['details']
     pool_name = job['poolName']
     owner_account_id = "itchy-harmony.testnet"
+    account_id = details["iou"]["account_id"]
     private_key = os.getenv("OWNER_PRIVATE_KEY", None)
     
     if private_key is None:
@@ -49,7 +50,14 @@ async def process_job(job):
                 "fees": fees,
             }
             print(f"SELL processed: {usdc_received} USDC received with {fees} fees")
-        
+
+        elif action == 'runAI':
+            pool = pool_api.get_pool(pool_name)
+            ai_action, logs = runAI(pool)
+            record_log(logs)
+            execute_buy_or_sell(ai_action)
+            print(f"NEAR AI run executed")
+
         elif action == 'fulfillDeposit':
             near_amount = details['iou']['amount']
             usdc_received, fees = swap_near_to_usdc(near_amount)
@@ -70,12 +78,24 @@ async def process_job(job):
             # todo: do we ignore the NEAR total here?
             tokens = 1000
             await fulfill_deposit(tokens, details, pool_name, owner_account_id, private_key)
+            pool_api.record_action(
+                pool_name,
+                "DEPOSIT",
+                account_id,
+                details={
+                    "from_asset": "USDC",
+                    "to_asset": "NEAR",
+                    "amount": usdc_received,
+                    "result_amount": near_amount,
+                    "fees": fees
+                }
+            )
             print(f"Deposit processed: {job_id} {details}")
         
         elif action == 'fulfillWithdraw':
             tokens = details['iou']['amount']
             pool = pool_api.get_pool(pool_name)
-            total_tokens = await ft_balance(pool_name, details["iou"]["account_id"])
+            total_tokens = await ft_balance(pool_name, account_id)
             portfolio_total = calculate_usdc_total_from_holdings(pool["holdings"])
             print("-- found", tokens, total_tokens)
             percentage_pool = Decimal(tokens)/Decimal(total_tokens)
@@ -110,6 +130,18 @@ async def process_job(job):
             near_received_minus_fee = near_received*Decimal("0.95")
             near_received_minus_fee_quantized = near_received_minus_fee.quantize(Decimal("1"), rounding=ROUND_DOWN)
             await fulfill_withdraw(near_received_minus_fee_quantized, details, pool_name, owner_account_id, private_key)
+            pool_api.record_action(
+                pool_name,
+                "WITHDRAW",
+                account_id,
+                details={
+                    "from_asset": "USDC",
+                    "to_asset": "NEAR",
+                    "amount": usdc_received,
+                    "result_amount": str(near_received_minus_fee_quantized),
+                    "fees": fees
+                }
+            )
             print(f"Withdraw processed: {job_id} {details}")
         
         else:

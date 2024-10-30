@@ -68,12 +68,6 @@ export default function PoolDetails() {
     fetchPoolData();
   }, [wallet, poolId]);
 
-  const handleRunAI = () => {
-    const newLog = { action: 'AI run', time: new Date().toLocaleTimeString() };
-    setActions((prevLogs) => [newLog, ...prevLogs]);
-    alert('AI has been triggered!');
-  };
-
   async function queueJob(jobType, payload) {
     try {
       const response = await fetch('/api/queueJob', {
@@ -93,6 +87,13 @@ export default function PoolDetails() {
       console.error('Error queuing job:', error);
     }
   }
+
+  const handleRunAI = async () => {
+    const newLog = { action: 'AI run', time: new Date().toLocaleTimeString() };
+    setActions((prevLogs) => [newLog, ...prevLogs]);
+    alert('AI has been triggered!');
+    await queueJob("runAI", {});
+  };
 
   // Simplified fulfill function with resolving state
   const fulfill = async (settlement) => {
@@ -173,7 +174,7 @@ export default function PoolDetails() {
 
         <div className={styles.aiSection}>
           <button onClick={handleRunAI} className={styles.runAiButton}>Run AI</button>
-          <h2>Oracle Actions</h2>
+          <h2>Actions</h2>
           <ul className={styles.actions}>
             {actions.map((log, index) => (
               <li key={index}>{log.action} at {log.time} by {log.by}</li>
