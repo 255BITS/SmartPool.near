@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
 import '@/app/globals.css';
 import { Navigation } from '@/components/navigation';
 import { NetworkId } from '@/config';
+import Link from 'next/link';
 
 import { NearContext, Wallet } from '@/wallets/near';
 
@@ -27,7 +28,11 @@ export default function RootLayout({ children }) {
       <body>
         <NearContext.Provider value={{ wallet, signedAccountId }}>
           <header className="header">
-            <div className="brand">SmartPool.near</div>
+            <div className="brand">
+              <Link href="/">
+                SmartPool.near
+              </Link>
+            </div>
             <button className="btn" onClick={handleAuthAction}>
               {authLabel}
             </button>
@@ -84,7 +89,7 @@ export default function RootLayout({ children }) {
           .main-content {
             flex-grow: 1;
             padding: 2rem;
-            background-color: #2a2a2a; /* Dark theme for main content */
+            background-color: #000; /* Dark theme for main content */
             color: #e0e0e0; /* Light text for readability */
           }
         `}</style>

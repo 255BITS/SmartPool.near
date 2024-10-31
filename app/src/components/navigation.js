@@ -13,15 +13,6 @@ export const Navigation = () => {
             Prediction Markets
           </Link>
         </div>
-        <div className="section">
-          Mockup
-          <Link href="/nfts" className={`nav-link ${pathname === '/nfts' ? 'active' : ''}`}>
-            NFTs
-          </Link>
-          <Link href="/real-world" className={`nav-link ${pathname === '/real-world' ? 'active' : ''}`}>
-            Real World
-          </Link>
-        </div>
       </nav>
 
       <style jsx>{`
