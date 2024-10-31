@@ -11,7 +11,26 @@ from string import Template
 MODEL = "llama-v3p1-70b-instruct"
 CLOB_ENDPOINT = 'https://clob.polymarket.com'
 
-def send_callback(pool_name, callback_url, predictions, prediction_market_url, recommended_action, choice):
+def parse_recommended_action(text):
+    # Define a regular expression pattern to capture the action, amount, and question
+    pattern = r'(?P<action>\w+)\s+(?P<amount>\d+)\s+"(?P<question>.+?)"'
+    
+    # Use regex to search and extract the components
+    match = re.search(pattern, text)
+    
+    if match:
+        # Extract and format the groups
+        action = match.group("action")
+        amount = int(match.group("amount"))
+        question = match.group("question")
+        
+        # Return the parsed components
+        return {"action": action, "amount": amount, "question": question}
+    else:
+        return None  # Return None if the pattern does not match
+
+
+def send_callback(pool_name, callback_url, prediction_market_url, recommended_action, choice, amount):
     """
     Sends a POST request to the callback_url with the specified data.
     
@@ -29,8 +48,9 @@ def send_callback(pool_name, callback_url, predictions, prediction_market_url, r
     # Prepare the payload
     payload = {
         "payload": {
-            "predictions": predictions,
             "prediction_market_url": prediction_market_url,
+            "choice": choice,
+            "amount": amount
         },
         "poolName": pool_name,
         "jobType": recommended_action,
@@ -359,9 +379,6 @@ Predictions:
     environment_id = globals()['env'].env_vars.get("environmentId", globals()['env'].env_vars.get("environment_id", "")) # this should be set by the app runner
     agent_id = "smartpool.near/prediction-market-assistant/0.0.7"
 
-    # Build a dictionary to map holdings to questions
-    holdings_dict = {holding['question']: holding for holding in inp.get('holdings', [])}
-
     print("WALLS", len(walls), walls)
     # Build a dictionary to map walls to questions
     walls_dict = {}
@@ -372,15 +389,20 @@ Predictions:
             wall = walls[idx] if idx < len(walls) else None
             walls_dict[question] = wall
             idx += 1
+    # Create a mapping for holdings based on question
+    holdings = inp.get('holdings', {})
 
     # Create a combined dictionary matching predictions, holdings, and walls
     combined_data = []
-    for prediction in predictions:
+    for idx, prediction in enumerate(predictions):
         question, reasoning, probability = prediction
-        # Match holding based on question text
-        holding = holdings_dict.get(question, None)
-        # Match wall based on question text
-        wall = walls_dict.get(question, None)
+
+        # Get holding based on question
+        holding = holdings.get(question, None)
+
+        # Get wall based on index (assuming walls list matches the order)
+        wall = walls[idx] if idx < len(walls) else None
+
         combined_data.append({
             'question': question,
             'reasoning': reasoning,
@@ -389,12 +411,102 @@ Predictions:
             'wall': wall
         })
 
+
+    # Calculate profit if holdings exist
+    for data_entry in combined_data:
+        holding = data_entry.get('holding')
+        wall = data_entry.get('wall')
+        if holding and wall:
+            print("COST BASIS", data_entry)
+            try:
+                current_price = float(wall[0][-1]["price"])
+                cost_basis = float(holding.get('cost_basis', 0))
+                amount = float(holding.get('amount', 0))
+                current_value = current_price * amount
+                profit = (current_price - cost_basis) * amount
+                data_entry['profit'] = profit
+                data_entry['current_value'] = current_value
+                data_entry['cost_basis'] = cost_basis
+                data_entry['current_price'] = current_price
+                data_entry['amount_owned'] = amount
+            except (IndexError, KeyError, ValueError, TypeError) as e:
+                print(f"Error calculating profit for question '{data_entry.get('question', 'N/A')}': {e}")
+                data_entry['profit'] = None
+        else:
+            data_entry['profit'] = None
+
     print("COMBINED DATA")
-    print(combined_data)
+    print(json.dumps(combined_data, indent=4))
+    recommended_sys_prompt = """You are deciding what action to take as a prediction fund manager. Your goal is to maximize profit in usdc while keeping good bets.
 
-    render_template({'sys_prompt': sys_prompt, 'prompt': question_prompt, 'predictions':json.dumps(predictions, indent=4),'environment_id':environment_id, 'agent_id':agent_id})
+You must keep the output format as either:
+Recommended action:
+BUY <amount:int> <choice:string>
+SELL <amount:int> <choice:string>
 
-    send_callback(inp.get("pool_name", None), inp.get("callback_url", None), predictions, inp["url"], "buy", ["yes", predictions[1][0]])
+You MUST follow this format for each entry! Only recommend a single action. Example outputs
+Recommended action (one of):
+SELL 10 "Question1"
+BUY 20 "Question2"
+
+Example:
+Prediction Market:
+Event Question: Who will win the Starcraft world championship in 2025?
+Volume: 10.0
+Notes: This is a market on the player to win the SC2 world championship in a best of 3.
+
+1. Flash
+2. Serral
+2. Player3
+
+Current holdings:
+USD: $100
+Position "Flash":
+  cost_basis: $0.4
+  current_cost: $0.6
+  amount_owned: 100
+  current_value: $60
+  profit: $20
+
+Market costs:
+"Flash" = 0.6
+"Serral" = 0.3
+"Player3" = 0.1
+
+Estimated probabilities:
+"Flash" = 0.3
+"Serral" = 0.6
+"Player3" = 0.1
+
+Recommended action:
+SELL 50 "Flash" YES"""
+    usdc_holdings = inp.get("usdc_available", 100)
+
+    current_holdings = f"USD: ${usdc_holdings}"
+    for data_entry in combined_data:
+        holding = data_entry.get('holding')
+        wall = data_entry.get('wall')
+        if holding and wall:
+            current_holdings += f"Position {data_entry['question']}\n"
+            current_holdings += f"  cost_basis: ${data_entry['cost_basis']}\n"
+            current_holdings += f"  current_cost: ${data_entry['current_price']}\n"
+            current_holdings += f"  amount_owned: {data_entry['amount_owned']}\n"
+            current_holdings += f"  current_value: ${data_entry['current_value']}\n"
+            current_holdings += f"  profit: ${data_entry['profit']}\n"
+    recommended_user_prompt = f"Prediction Market:\n{formatted_event}{formatted_markets}\n\nCurrent holdings:\n{current_holdings}\n\nMarket costs:\n{formatted_prices}\n\nEstimated probabilities:\n{json.dumps(predictions,indent=2)}\n\nRecommended action:\n"
+
+    print("CALLING")
+    print(recommended_sys_prompt)
+    print(recommended_user_prompt)
+
+    prompts = [{"role": "system", "content": recommended_sys_prompt}, {"role": "user", "content": recommended_user_prompt}]
+    recommended_action = env.completion(prompts, model=MODEL)
+
+    parsed = parse_recommended_action(recommended_action)
+    print("Recommended:", recommended_action, parsed)
+    render_template({'sys_prompt': sys_prompt, 'prompt': question_prompt, 'predictions':json.dumps(predictions, indent=4),'environment_id':environment_id, 'agent_id':agent_id, "recommended_action": recommended_action, "recommended_sys_prompt": recommended_sys_prompt, "recommended_user_prompt": recommended_user_prompt})
+
+    send_callback(inp.get("pool_name", None), inp.get("callback_url", None), inp["url"], parsed["action"].lower(), ["yes", parsed["question"]], parsed["amount"])
     env.mark_done()
 
 if __name__ == "__main__":

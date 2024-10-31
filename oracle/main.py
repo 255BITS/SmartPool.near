@@ -84,7 +84,8 @@ def runAI(pool):
     # TODO needs current prices
     print("--", pool)
     holdings = pool["holdings"]
-    response = call_near_ai_api(pool.name, "https://polymarket.com/event/when-will-gpt-5-be-announced?tid=1729566306341", 0, {})
+    usdc = pool["holdings"]["USDC"]["amount"]
+    response = call_near_ai_api(pool.name, "https://polymarket.com/event/when-will-gpt-5-be-announced?tid=1729566306341", usdc, holdings)
     print("___", response)
     return {"operation": "BUY"}, "http://fake url"
 
