@@ -1,4 +1,19 @@
 import requests
+import re
+from urllib.parse import urlparse, parse_qs
+
+def parse_event_url(url):
+    # Parse the URL
+    parsed_url = urlparse(url)
+    
+    # Extract the event_name from the path (everything after '/event/')
+    event_name = parsed_url.path.split('/event/')[-1]
+    
+    # Extract the `tid` from query parameters
+    query_params = parse_qs(parsed_url.query)
+    tid = query_params.get('tid', [None])[0]
+    
+    return [event_name, tid]
 
 class PoolApiClient:
     def __init__(self, base_url):
@@ -64,3 +79,15 @@ class PoolApiClient:
             print(f"Holdings updated: {asset_name} increased by {amount} in {pool_name}")
         except requests.RequestException as e:
             print(f"Failed to update holdings for {asset_name}: {e}")
+
+    def get_market_prices(self, pool):
+        """Fetches pending jobs from the /api/jobs endpoint."""
+        try:
+            event_name, tid = parse_event_url(pool["markets"][0])
+            response = requests.get(f"{self.base_url}/api/market_prices?event_name={event_name}&tid={tid}")
+            response.raise_for_status()
+            return response.json()
+        except requests.RequestException as e:
+            print(f"Error fetching jobs: {e}")
+            return []
+

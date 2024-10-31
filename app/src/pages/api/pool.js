@@ -47,8 +47,13 @@ export default async function handler(req, res) {
     if(!pool.holdings.USDC) {
       pool.holdings.USDC = {name: "USDC", amount:"0"};
     }
+    if(!pool.holdings["Will the Commanders win Super Bowl 2025?"]) {
+      pool.holdings["Will the Commanders win Super Bowl 2025?"] = {name: "Will the Commanders win Super Bowl 2025?", amount:"100", cost_basis: "0.001"};
+    }
     pool.holdings.NEAR = {name: "NEAR", amount: await getNearBalance(name)};
     pool.estimatedValue = PoolService.getEstimatedValue(pool.holdings);
+    pool.markets = ["https://polymarket.com/event/superbowl-champion-2025?tid=1730165174152"];
+    pool.type = "prediction_market"
     if(!pool.details) {
       pool.details = {};
     }

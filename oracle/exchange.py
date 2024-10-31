@@ -37,7 +37,6 @@ async def swap_near_to_usdc(near_amount, pool_name, owner_account_id, private_ke
     return Decimal(near_amount) * USD_CONVERSION_RATE / Decimal(1e24), Decimal(0)
 
 async def swap_usdc_to_near(usdc_amount, pool_name, owner_account_id, private_key, contract_id="smartpool.testnet", network="testnet"):
-
     # Convert usdc_amount to Decimal to ensure precise arithmetic
     usdc_amount_decimal = Decimal(usdc_amount)
     near_amount = (usdc_amount_decimal / Decimal(USD_CONVERSION_RATE)) * Decimal("1e24")
@@ -74,15 +73,22 @@ async def swap_usdc_to_near(usdc_amount, pool_name, owner_account_id, private_ke
 
     return near_amount_truncated, Decimal(0)
 
-def calculate_usdc_total_from_holdings(holdings):
+def calculate_usdc_total_from_holdings(holdings, market_prices, side):
     # Initialize usdc with the amount from "USDC" key, if it exists
     usdc = holdings.get("USDC", {}).get("amount", "0")
     usdc = Decimal(usdc)
 
     # Iterate through holdings, adding to usdc when the key is not "USDC"
     for key, value in holdings.items():
+        option = value.get("option", "YES")
         if key != "USDC" and key != "NEAR":
-            usdc += Decimal(value.get("amount", "0"))
+            bid = market_prices.get(key).get("bid")
+            ask = market_prices.get(key).get("ask")
+            if option == "NO":
+                price = (Decimal(1) - Decimal(ask))
+            else:
+                price = Decimal(bid)
+            usdc += Decimal(value.get("amount", "0"))*price
 
     print("Holdings:", holdings)
     return usdc

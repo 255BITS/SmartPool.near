@@ -181,7 +181,8 @@ async def process_job(job):
 
             # Step 3: Get current pool USDC holdings BEFORE adding new usdc_received
             pool = pool_api.get_pool(pool_name)
-            current_usdc_holdings = calculate_usdc_total_from_holdings(pool["holdings"])
+            market_prices = pool_api.get_market_prices(pool)
+            current_usdc_holdings = calculate_usdc_total_from_holdings(pool["holdings"], market_prices, "ASK")
             pool_total_value_before = Decimal(current_usdc_holdings)
 
             # Step 4: Get current total token supply in standard units
@@ -240,14 +241,15 @@ async def process_job(job):
 
             # Step 3: Get the current pool holdings and total USDC value
             pool = pool_api.get_pool(pool_name)
-            portfolio_total_usdc = calculate_usdc_total_from_holdings(pool["holdings"])
+            market_prices = pool_api.get_market_prices(pool)
+            portfolio_total_usdc = calculate_usdc_total_from_holdings(pool["holdings"], market_prices, "bid")
 
             print("-- found tokens:", tokens, "total tokens:", total_tokens)
             print("-- percentage of pool to withdraw:", percentage_pool)
 
             # Step 4: Rebalance the portfolio to get the required USDC
             # (Assuming rebalance_portfolio returns the USDC amount equivalent to the percentage of the pool)
-            usdc_received = rebalance_portfolio(pool["holdings"], percentage_pool, portfolio_total_usdc)
+            usdc_received = rebalance_portfolio(pool["holdings"], percentage_pool, portfolio_total_usdc, market_prices)
 
             # Record the REBALANCE action
             pool_api.record_action(
