@@ -211,13 +211,13 @@ def format_prices(parsed_data):
             idx+=1
             if order_book is None:
                 formatted_output.append(f"{s} = Market closed")
-                walls += []
+                walls += [[[],[]]]
                 continue
             walls += [[order_book.get('bids', [])[-3:], order_book.get('asks', [])[-3:]]]
             s += f" = {float(walls[-1][0][-1].get('price'))*100.0}%-{float(walls[-1][1][-1].get('price'))*100.0}%"
             formatted_output.append(s)
 
-        return "\n".join(formatted_output)
+        return "\n".join(formatted_output), walls
 
 def format_events(parsed_data):
     """
@@ -298,7 +298,7 @@ def main():
 
     formatted_markets = format_markets(data)
     formatted_event = format_events(data)
-    formatted_prices = format_prices(data)
+    formatted_prices, walls = format_prices(data)
     question_prompt = formatted_event + formatted_markets + "\n\nCurrent market predictions:\n"+formatted_prices+"\n\nPredictions:\n"
     sys_prompt = """You are predicting an event. You will return the probabilities of each option being true.
 
@@ -336,6 +336,7 @@ Predictions:
 
     lines = predictions_llm_result.splitlines()
     idx = 0
+    predictions = []
     for line in lines:
         if line.strip():
             idx += 1
@@ -343,10 +344,10 @@ Predictions:
             match = re.match(r'(.*?):\s*(.*?)\s*=\s*([\d\.]+)%', line)
 
             if match:
-                question = match.group(1).strip()
+                question = market['question']
                 reasoning = match.group(2).strip()
                 probability = float(match.group(3))/100.0
-                predictions[idx]=[question,reasoning,probability]
+                predictions.append([question,reasoning,probability])
             else:
                 print(f"Could not parse line: {line}")
 
@@ -357,6 +358,40 @@ Predictions:
     print(predictions)
     environment_id = globals()['env'].env_vars.get("environmentId", globals()['env'].env_vars.get("environment_id", "")) # this should be set by the app runner
     agent_id = "smartpool.near/prediction-market-assistant/0.0.7"
+
+    # Build a dictionary to map holdings to questions
+    holdings_dict = {holding['question']: holding for holding in inp.get('holdings', [])}
+
+    print("WALLS", len(walls), walls)
+    # Build a dictionary to map walls to questions
+    walls_dict = {}
+    idx = 0
+    for event in data:
+        for market in event['markets']:
+            question = market['question']
+            wall = walls[idx] if idx < len(walls) else None
+            walls_dict[question] = wall
+            idx += 1
+
+    # Create a combined dictionary matching predictions, holdings, and walls
+    combined_data = []
+    for prediction in predictions:
+        question, reasoning, probability = prediction
+        # Match holding based on question text
+        holding = holdings_dict.get(question, None)
+        # Match wall based on question text
+        wall = walls_dict.get(question, None)
+        combined_data.append({
+            'question': question,
+            'reasoning': reasoning,
+            'probability': probability,
+            'holding': holding,
+            'wall': wall
+        })
+
+    print("COMBINED DATA")
+    print(combined_data)
+
     render_template({'sys_prompt': sys_prompt, 'prompt': question_prompt, 'predictions':json.dumps(predictions, indent=4),'environment_id':environment_id, 'agent_id':agent_id})
 
     send_callback(inp.get("pool_name", None), inp.get("callback_url", None), predictions, inp["url"], "buy", ["yes", predictions[1][0]])
