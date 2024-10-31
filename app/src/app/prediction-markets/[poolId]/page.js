@@ -93,8 +93,6 @@ export default function PoolDetails() {
   }
 
   const handleRunAI = async () => {
-    const newLog = { action: 'AI run', time: new Date().toLocaleTimeString() };
-    setActions((prevLogs) => [newLog, ...prevLogs]);
     alert('AI has been triggered!');
     await queueJob("runAI", {});
   };

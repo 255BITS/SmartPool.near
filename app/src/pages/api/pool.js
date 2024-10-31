@@ -54,9 +54,9 @@ export default async function handler(req, res) {
       if(!pool.holdings.USDC) {
         pool.holdings.USDC = {name: "USDC", amount:"0"};
       }
-      if(!pool.holdings[POLY_QUESTION]) {
-        pool.holdings[POLY_QUESTION] = {name: POLY_QUESTION, amount:"100", cost_basis: "0.1"};
-      }
+      //if(!pool.holdings[POLY_QUESTION]) {
+      //  pool.holdings[POLY_QUESTION] = {name: POLY_QUESTION, amount:"100", cost_basis: "0.1"};
+      //}
       pool.holdings.NEAR = {name: "NEAR", amount: await getNearBalance(name)};
 
       const parsedEvents = await fetchAndParseEvents(POLY_EVENT);

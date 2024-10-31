@@ -16,6 +16,9 @@ COPY . .
 # Build the app
 RUN npm run build
 
+# Generate Prisma client
+RUN npx prisma generate
+
 # Prune non-production dependencies
 RUN npm prune --production
 
@@ -29,6 +32,7 @@ COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/.next ./.next
 COPY --from=builder /app/package.json ./
 COPY --from=builder /app/prisma ./prisma
+COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 
 # Add the migration and start command
 CMD ["sh", "-c", "npm run migrate && npm start"]

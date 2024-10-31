@@ -11,10 +11,10 @@ from pool_api_client import PoolApiClient
 from decimal import Decimal, ROUND_DOWN
 
 # Set up PoolApiClient with the AILP URL
-AILP_URL = os.getenv('AILPURL', 'http://localhost:3000')
+SMARTPOOL_URL = os.getenv('SMARTPOOL_URL', 'http://localhost:3000')
 NEAR_CONFIG=os.getenv("NEAR_CONFIG", "")
 NEARAI_CALLBACK_URL=os.getenv("NEARAI_CALLBACK_URL", "")
-pool_api = PoolApiClient(AILP_URL)
+pool_api = PoolApiClient(SMARTPOOL_URL)
 
 def fetch_jobs():
     """Fetches pending jobs from the Pool API."""
@@ -63,14 +63,14 @@ def call_near_ai_api(pool_name, prediction_market_url, usdc_available, holdings)
     }
 
     payload = json.dumps({
-        "agent_id": "smartpool.near/prediction-market-assistant/0.0.14",
-        "new_message": new_message,
+        "agent_id": "smartpool.near/prediction-market-assistant/0.1.0",
+        "new_message": json.dumps(new_message),
         "max_iterations": 1
     }).encode("utf-8")
 
     req = urllib.request.Request(url, data=payload, headers=headers)
     try:
-        print("Calling...")
+        print("Calling...", url, payload, headers)
         with urllib.request.urlopen(req) as response:
             result = response.read()
             print("RESULT")
@@ -80,12 +80,12 @@ def call_near_ai_api(pool_name, prediction_market_url, usdc_available, holdings)
         print(f"Error calling NEAR AI API: {e}")
         return None
 
-def runAI(pool):
+def runAI(pool, pool_name):
     # TODO needs current prices
     print("--", pool)
     holdings = pool["holdings"]
     usdc = pool["holdings"]["USDC"]["amount"]
-    response = call_near_ai_api(pool.name, "https://polymarket.com/event/when-will-gpt-5-be-announced?tid=1729566306341", usdc, holdings)
+    response = call_near_ai_api(pool_name, "https://polymarket.com/event/when-will-gpt-5-be-announced?tid=1729566306341", usdc, holdings)
     print("___", response)
     return {"operation": "BUY"}, "http://fake url"
 
@@ -124,7 +124,7 @@ async def process_job(job):
 
         elif action == 'runAI':
             pool = pool_api.get_pool(pool_name)
-            ai_action, log_url = runAI(pool)
+            ai_action, log_url = runAI(pool, pool_name)
             pool_api.record_action(
                 pool_name,
                 "AI CALL",
@@ -134,11 +134,6 @@ async def process_job(job):
                     "ai_action": ai_action
                 }
             )
-
-            if ai_action["operation"] == "BUY":
-                print("Should BUY here", ai_action)
-            elif ai_action["operation"] == "SELL":
-                print("Should SELL here", ai_action)
 
             print(f"NEAR AI run executed")
 
