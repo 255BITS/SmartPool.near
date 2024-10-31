@@ -31,3 +31,4 @@ Dockerfile
 *.log
 .DS_Store
 **/*.secrets
+deploy
