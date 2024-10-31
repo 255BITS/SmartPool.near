@@ -6,6 +6,7 @@ import { NearContext } from '@/wallets/near';
 import styles from '@/app/app.module.css';
 import Decimal from 'decimal.js';
 import { utils } from 'near-api-js';
+import { formatDistanceToNow } from 'date-fns';
 
 const CONTRACT_ID = 'smartpool.testnet';
 
@@ -184,7 +185,9 @@ export default function PoolDetails() {
           <h2>Actions</h2>
           <ul className={styles.actions}>
             {actions.map((log, index) => (
-              <li key={index}>{log.action} at {log.time} by {log.by}</li>
+              <li key={index}>
+                {formatDistanceToNow(new Date(log.createdAt), { addSuffix: true })}: {log.action} by {log.by}
+              </li>
             ))}
           </ul>
         </div>
