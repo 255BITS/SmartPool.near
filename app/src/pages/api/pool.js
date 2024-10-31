@@ -41,7 +41,7 @@ export default async function handler(req, res) {
   const { name } = req.query;
   const POLY_EVENT = "when-will-gpt-5-be-announced";
   const POLY_TID = "1729566306341";
-  const POLY_MARKET = `https://polymarket.com/event/{POLY_EVENT}?tid={POLY_TID}`;
+  const POLY_MARKET = `https://polymarket.com/event/${POLY_EVENT}?tid=${POLY_TID}`;
   const POLY_QUESTION = "GPT-5 not announced in 2024?"
 
   if (typeof name !== 'string') {
