@@ -16,6 +16,7 @@ export default function PoolDetails() {
   const [poolEstimatedValue, setPoolEstimatedValue] = useState('Loading...');
   const [poolName, setPoolName] = useState('Loading...');
   const [poolHoldings, setPoolHoldings] = useState({});
+  const [poolMarkets, setPoolMarkets] = useState(null);
   const [participants, setParticipants] = useState('Loading...');
   const [pendingSettlements, setPendingSettlements] = useState([]);
   const [actions, setActions] = useState([]);
@@ -30,6 +31,7 @@ export default function PoolDetails() {
         setPoolName(pool.name);
         setPoolHoldings(pool.holdings);
         setPoolEstimatedValue(pool.estimatedValue);
+        setPoolMarkets(pool.markets);
       } catch (error) {
         console.error('Error fetching pool details:', error);
       }
@@ -107,13 +109,13 @@ export default function PoolDetails() {
 
   return (
     <div className={styles.poolDetails}>
-      <h1>SmartPool Details: {poolName}</h1>
+      <h1>SmartPool {poolName} Details</h1>
       
       <div className={styles.mainContent}>
         
         <div className={styles.infoSection}>
           <h2>Markets</h2>
-            Who will win the Superbowl? [link]
+            {poolMarkets && poolMarkets[0]}
           <h2>Estimated Value</h2>
           <p><strong>
             {poolEstimatedValue && poolEstimatedValue.totalNEAR && (

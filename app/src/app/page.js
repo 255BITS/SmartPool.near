@@ -12,15 +12,12 @@ export default function Home() {
         
         <div className={styles.valueProp}>
           <div className={styles.valueItem}>
-            <img src="/images/create-smartpool.png" alt="Create SmartPool" />
             <p>1. Create or deposit funds into an AI-powered SmartPool</p>
           </div>
           <div className={styles.valueItem}>
-            <img src="/images/ai-logs.png" alt="AI Logs" />
             <p>2. Sit back and watch as the AI works</p>
           </div>
           <div className={styles.valueItem}>
-            <img src="/images/withdraw-profits.png" alt="Withdraw Profits" />
             <p>3. Withdraw anytime to realize profits!</p>
           </div>
         </div>
