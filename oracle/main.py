@@ -115,7 +115,7 @@ async def process_job(job):
             ask = Decimal(market_prices.get(key).get("ask"))
             cost_usdc = -amount * ask
             pool_api.add_pool_holdings(pool_name, key, decimal_to_str(amount), decimal_to_str(ask, "0.001"))
-            pool_api.add_pool_holdings(pool_name, "USDC", decimal_to_str(cost_usdc, "0.01"))
+            pool_api.add_pool_holdings(pool_name, "USDC", decimal_to_str(cost_usdc, "0.01"), decimal_to_str(ask, "0.001"))
             pool_api.record_action(
                 pool_name,
                 "BUY",
@@ -132,7 +132,7 @@ async def process_job(job):
             bid = Decimal(market_prices.get(key).get("bid"))
             usdc = amount * bid
             pool_api.add_pool_holdings(pool_name, "USDC", decimal_to_str(usdc, "0.01"))
-            pool_api.add_pool_holdings(pool_name, key, decimal_to_str(amount), decimal_to_str(bid, "0.001"))
+            pool_api.add_pool_holdings(pool_name, key, decimal_to_str(-amount))
             pool_api.record_action(
                 pool_name,
                 "SELL",
