@@ -87,7 +87,6 @@ def runAI(pool, pool_name):
     usdc = pool["holdings"]["USDC"]["amount"]
     response = call_near_ai_api(pool_name, "https://polymarket.com/event/when-will-gpt-5-be-announced?tid=1729566306341", usdc, holdings)
     print("___", response)
-    return {"operation": "BUY"}, "http://fake url"
 
 async def process_job(job):
     job_id = job['id']
@@ -105,6 +104,14 @@ async def process_job(job):
 
     try:
         if action == 'buy':
+            pool = pool_api.get_pool(pool_name)
+            market_prices = pool_api.get_market_prices(pool)
+            key = details["choice"][1]
+            amount = Decimal(details["amount"])
+            ask = Decimal(market_prices.get(key).get("ask"))
+            cost_usdc = -amount * ask
+            pool_api.add_pool_holdings(pool_name, key, decimal_to_str(amount))
+            pool_api.add_pool_holdings(pool_name, "USDC", decimal_to_str(cost_usdc, "0.01"))
             pool_api.record_action(
                 pool_name,
                 "BUY",
@@ -114,6 +121,14 @@ async def process_job(job):
             )
         
         elif action == 'sell':
+            pool = pool_api.get_pool(pool_name)
+            market_prices = pool_api.get_market_prices(pool)
+            key = details["choice"][1]
+            amount = Decimal(details["amount"])
+            bid = Decimal(market_prices.get(key).get("bid"))
+            usdc = amount * bid
+            pool_api.add_pool_holdings(pool_name, "USDC", decimal_to_str(usdc, "0.01"))
+            pool_api.add_pool_holdings(pool_name, key, decimal_to_str(amount))
             pool_api.record_action(
                 pool_name,
                 "SELL",
@@ -124,14 +139,12 @@ async def process_job(job):
 
         elif action == 'runAI':
             pool = pool_api.get_pool(pool_name)
-            ai_action, log_url = runAI(pool, pool_name)
+            runAI(pool, pool_name)
             pool_api.record_action(
                 pool_name,
                 "AI CALL",
                 "Platform",
                 details={
-                    "log_url": log_url,
-                    "ai_action": ai_action
                 }
             )
 

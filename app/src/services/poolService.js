@@ -35,7 +35,7 @@ class PoolService {
     let totalNEAR = holdings.NEAR.amount;
     
     // Convert USDC to NEAR equivalent and add to totalNEAR
-    totalNEAR += holdings.USDC.amount / NEAR_CONVERSION_USD;
+    totalNEAR += holdings.USDC.amount / NEAR_CONVERSION_USD * 1e24;
 
     // Iterate over other holdings and convert to NEAR
     for (let asset in holdings) {
