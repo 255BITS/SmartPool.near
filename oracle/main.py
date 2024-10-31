@@ -223,7 +223,7 @@ async def process_job(job):
             total_tokens = Decimal(total_tokens_yocto) / Decimal(1e24)
 
             # Step 2: Calculate the percentage of the pool the user owns
-            percentage_pool = tokens / total_tokens
+            percentage_pool = tokens / (total_tokens+tokens)
 
             # Step 3: Get the current pool holdings and total USDC value
             pool = pool_api.get_pool(pool_name)

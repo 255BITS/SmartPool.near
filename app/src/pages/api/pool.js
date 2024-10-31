@@ -2,6 +2,7 @@
 
 import { providers } from 'near-api-js';
 import PoolService from '@/services/poolService';
+import { fetchAndParseEvents, formatPrices } from '@/services/polyService';
 
 const CONTRACT_ID = 'smartpool.testnet';
 const networkId = 'testnet';
@@ -38,7 +39,9 @@ const getNearBalance = async (poolId) => {
 export default async function handler(req, res) {
   const { method } = req;
   const { name } = req.query;
-  const POLY_MARKET = "https://polymarket.com/event/when-will-gpt-5-be-announced?tid=1729566306341";
+  const POLY_EVENT = "when-will-gpt-5-be-announced";
+  const POLY_TID = "1729566306341";
+  const POLY_MARKET = `https://polymarket.com/event/{POLY_EVENT}?tid={POLY_TID}`;
   const POLY_QUESTION = "GPT-5 not announced in 2024?"
 
   if (typeof name !== 'string') {
@@ -52,10 +55,13 @@ export default async function handler(req, res) {
         pool.holdings.USDC = {name: "USDC", amount:"0"};
       }
       if(!pool.holdings[POLY_QUESTION]) {
-        pool.holdings[POLY_QUESTION] = {name: POLY_QUESTION, amount:"10000", cost_basis: "0.1"};
+        pool.holdings[POLY_QUESTION] = {name: POLY_QUESTION, amount:"100", cost_basis: "0.1"};
       }
       pool.holdings.NEAR = {name: "NEAR", amount: await getNearBalance(name)};
-      pool.estimatedValue = PoolService.getEstimatedValue(pool.holdings);
+
+      const parsedEvents = await fetchAndParseEvents(POLY_EVENT);
+      const formattedPrices = formatPrices(parsedEvents);
+      pool.estimatedValue = PoolService.getEstimatedValue(pool.holdings, formattedPrices);
       pool.markets = [POLY_MARKET];
       pool.type = "prediction_market";
       if(!pool.details) {
