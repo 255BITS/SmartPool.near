@@ -66,12 +66,13 @@ class PoolApiClient:
         except requests.RequestException as e:
             print(f"Failed to retrieve pool '{pool_name}': {e}")
 
-    def add_pool_holdings(self, pool_name, asset_name, amount):
+    def add_pool_holdings(self, pool_name, asset_name, amount, cost_basis="0"):
         """Updates pool holdings by adding to the specified asset amount."""
         payload = {
             "poolName": pool_name,
             "assetName": asset_name,
             "amount": amount,
+            "costBasis": cost_basis
         }
         try:
             response = requests.post(f"{self.base_url}/api/add_pool_holdings", json=payload)

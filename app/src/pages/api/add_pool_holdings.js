@@ -5,7 +5,7 @@ import Decimal from 'decimal.js';
 
 export default async function handler(req, res) {
   if (req.method === 'POST') {
-    const { poolName, assetName, amount } = req.body;
+    const { poolName, assetName, amount, costBasis } = req.body;
 
     if (!poolName || !assetName || amount == null) {
       return res.status(400).json({ error: 'Missing required fields: poolName, assetName, or amount' });
@@ -23,11 +23,13 @@ export default async function handler(req, res) {
 
       // Parse and update holdings
       const holdings = pool.holdings || {};
-      const currentAsset = holdings[assetName] || { amount: Decimal(0), name: assetName };
+      const currentAsset = holdings[assetName] || { amount: Decimal(0), name: assetName, cost_basis: costBasis };
+      const newAmount = (Decimal(currentAsset.amount || 0).plus(Decimal(amount))).toString();
+      // TODO: update cost basis on existing asset
 
       holdings[assetName] = {
         ...currentAsset,
-        amount: (Decimal(currentAsset.amount || 0).plus(Decimal(amount))).toString(),
+        amount: newAmount
       };
 
       // Update the pool with new holdings

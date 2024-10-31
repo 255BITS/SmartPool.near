@@ -83,8 +83,12 @@ def call_near_ai_api(pool_name, prediction_market_url, usdc_available, holdings)
 def runAI(pool, pool_name):
     # TODO needs current prices
     print("--", pool)
-    holdings = pool["holdings"]
     usdc = pool["holdings"]["USDC"]["amount"]
+    holdings = pool["holdings"]
+    if "NEAR" in holdings:
+        del holdings["NEAR"]
+    if "USDC" in holdings:
+        del holdings["USDC"]
     response = call_near_ai_api(pool_name, "https://polymarket.com/event/when-will-gpt-5-be-announced?tid=1729566306341", usdc, holdings)
     print("___", response)
 
@@ -110,7 +114,7 @@ async def process_job(job):
             amount = Decimal(details["amount"])
             ask = Decimal(market_prices.get(key).get("ask"))
             cost_usdc = -amount * ask
-            pool_api.add_pool_holdings(pool_name, key, decimal_to_str(amount))
+            pool_api.add_pool_holdings(pool_name, key, decimal_to_str(amount), decimal_to_str(ask, "0.001"))
             pool_api.add_pool_holdings(pool_name, "USDC", decimal_to_str(cost_usdc, "0.01"))
             pool_api.record_action(
                 pool_name,
@@ -128,7 +132,7 @@ async def process_job(job):
             bid = Decimal(market_prices.get(key).get("bid"))
             usdc = amount * bid
             pool_api.add_pool_holdings(pool_name, "USDC", decimal_to_str(usdc, "0.01"))
-            pool_api.add_pool_holdings(pool_name, key, decimal_to_str(amount))
+            pool_api.add_pool_holdings(pool_name, key, decimal_to_str(amount), decimal_to_str(bid, "0.001"))
             pool_api.record_action(
                 pool_name,
                 "SELL",
