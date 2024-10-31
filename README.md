@@ -1,10 +1,10 @@
-# SmartPool Prediction Market Assistant
+# SmartPool.near
 
-SmartPool is an intelligent, autonomous pool of resources that allows for optimized deposits and withdrawals, with assets liquidated or invested on demand. Each pool operates under an intelligent agent, which continuously runs optimizations based on specific market dynamics—such as prediction markets in this example.
+SmartPool.near is an intelligent, autonomous pool of resources that allows for optimized deposits and withdrawals, with assets liquidated or invested on demand. Each pool operates under an intelligent agent, which continuously runs optimizations based on specific market dynamics—such as prediction markets in this example.
 
 ## Project Overview
 
-The SmartPool framework is designed to manage pooled assets intelligently by:
+The SmartPool.near framework is designed to manage pooled funds intelligently by:
 - **Handling Deposits**: Assets are invested as they enter the pool, following the agent's strategies to maximize returns.
 - **Processing Withdrawals**: Assets are liquidated upon withdrawal requests, ensuring efficient cash-out while balancing the pool’s positions.
 - **Optimizing Investments**: Each pool’s underlying agent continuously evaluates the current market landscape, making buy/sell decisions, adjusting holdings, and optimizing the pool’s allocations to enhance performance.
