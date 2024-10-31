@@ -35,8 +35,8 @@ In this example, the agent is configured to optimize holdings within a predictio
 - **Description**: The Next.js web application offers a frontend interface for users to interact with the SmartPool, displaying real-time insights on market trends, predictions, and job processing.
 
 ### 4. **Smart Contracts**
-- **Path**: `smart_contract/` (coming soon)
-- **Description**: The upcoming Rust-based NEAR smart contracts will facilitate the pool’s intelligent deposit and withdrawal processes. These contracts will autonomously manage the fund’s liquidity by executing delayed transactions based on the agent's market optimization.
+- **Path**: `smart_contracts/`
+- **Description**: Rust-based NEAR smart contracts will facilitate the pool’s intelligent deposit and withdrawal processes. These contracts will autonomously manage the fund’s liquidity by executing delayed transactions based on the agent's market optimization.
 
 ## NEAR AI Agent
 
