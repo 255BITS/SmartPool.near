@@ -127,7 +127,7 @@ export default function PoolDetails() {
           <ul>
             {Object.entries(poolHoldings).map(([key, value]) => {
               if(key !== "USDC" && key !== "NEAR") {
-                return <li key={key}>{value.name}: {value.amount} @ ${value.cost_basis}</li>
+                return <li key={key}>{value.name}: {value.amount} Shares</li>
               }
               return null;
             })}
