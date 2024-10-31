@@ -93,9 +93,77 @@ def calculate_usdc_total_from_holdings(holdings, market_prices, side):
     print("Holdings:", holdings)
     return usdc
 
-def rebalance_portfolio(holdings, percentage_pool, portfolio_total):
-    print("Would rebalance")
-    return Decimal(0.5)
+def rebalance_portfolio(holdings, percentage_pool, portfolio_total, market_prices):
+    """
+    Rebalance the portfolio to ensure the USDC holdings equal the desired percentage of the total portfolio value.
+    
+    Parameters:
+    - holdings: dict of asset holdings with amounts.
+    - percentage_pool: desired percentage of the portfolio to be in USDC.
+    - portfolio_total: total value of the portfolio in USDC.
+    - market_prices: dict of market prices for each asset with 'bid' and 'ask' prices.
+    
+    Returns:
+    - new_holdings: dict with updated asset amounts after rebalancing.
+    - target_usdc: Decimal representing the target USDC amount.
+    """
+    # Calculate the target USDC amount based on the desired percentage of the portfolio total
+    target_usdc = Decimal(percentage_pool) * Decimal(portfolio_total)
+    
+    # Get current USDC holdings amount, defaulting to 0 if not present
+    current_usdc = Decimal(holdings.get("USDC", {}).get("amount", "0"))
+    
+    # If current USDC holdings meet or exceed the target, no rebalancing is needed
+    if current_usdc >= target_usdc:
+        return holdings, target_usdc  # Return the original holdings and target USDC amount
+    
+    # Calculate the USDC shortfall needed to reach the target
+    usdc_shortfall = target_usdc - current_usdc
+    
+    # Create a copy of holdings to avoid modifying the original data
+    new_holdings = holdings.copy()
+    
+    # Extract non-USDC assets and their amounts
+    non_usdc_assets = {
+        asset: Decimal(details.get("amount", "0"))
+        for asset, details in holdings.items()
+        if asset != "USDC" and asset != "NEAR"
+    }
+    
+    # Calculate the total value of non-USDC assets in USDC terms
+    total_non_usdc_value = Decimal(0)
+    for asset, amount in non_usdc_assets.items():
+        bid_price = Decimal(market_prices[asset]["bid"])
+        total_non_usdc_value += amount * bid_price
+    
+    # Proportionally calculate the amount to sell from each non-USDC asset
+    for asset, amount in non_usdc_assets.items():
+        bid_price = Decimal(market_prices[asset]["bid"])
+        
+        # Determine the asset's value in USDC
+        asset_value_in_usdc = amount * bid_price
+        
+        # Calculate the proportion of the total non-USDC value this asset represents
+        asset_proportion = asset_value_in_usdc / total_non_usdc_value
+        
+        # Calculate the amount of USDC this asset needs to contribute to cover its share of the shortfall
+        asset_usdc_contribution = usdc_shortfall * asset_proportion
+        
+        # Determine the amount of the asset to sell
+        amount_to_sell = asset_usdc_contribution / bid_price
+        
+        # Update the asset's amount in new_holdings
+        new_amount = amount - amount_to_sell
+        new_holdings[asset]["amount"] = decimal_to_str(new_amount)
+    
+    # Update the USDC amount in new_holdings to reflect the addition from sold assets
+    new_usdc_amount = current_usdc + usdc_shortfall
+    new_holdings["USDC"] = {"amount": str(new_usdc_amount)}
+    del new_holdings["NEAR"]
+    
+    # Return the rebalanced holdings and the target USDC amount
+    print("Rebalanced Holdings:", new_holdings)
+    return new_holdings, target_usdc
 
 def decimal_to_str(tokens, exp="1"):
     quantized = str(tokens.quantize(Decimal(exp), rounding=ROUND_DOWN))

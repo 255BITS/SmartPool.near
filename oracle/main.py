@@ -234,7 +234,12 @@ async def process_job(job):
 
             # Step 4: Rebalance the portfolio to get the required USDC
             # (Assuming rebalance_portfolio returns the USDC amount equivalent to the percentage of the pool)
-            usdc_received = rebalance_portfolio(pool["holdings"], percentage_pool, portfolio_total_usdc, market_prices)
+            print("This user is getting", percentage_pool)
+            new_holdings, usdc_received = rebalance_portfolio(pool["holdings"], percentage_pool, portfolio_total_usdc, market_prices)
+            print("new holdings", new_holdings)
+            print("usdc_received", usdc_received)
+
+            print('pool updated')
 
             # Record the REBALANCE action
             pool_api.record_action(
@@ -251,6 +256,8 @@ async def process_job(job):
 
             # Step 5: Swap USDC to NEAR
             near_received, fees = await swap_usdc_to_near(usdc_received, pool_name, owner_account_id, private_key)
+            new_holdings["USDC"]["amount"] = decimal_to_str(Decimal(new_holdings["USDC"]["amount"]) - usdc_received)
+            pool_api.update_pool(pool_name, new_holdings)
 
             # Record the SWAP action
             pool_api.record_action(

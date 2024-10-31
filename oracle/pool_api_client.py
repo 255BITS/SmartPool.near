@@ -80,6 +80,18 @@ class PoolApiClient:
         except requests.RequestException as e:
             print(f"Failed to update holdings for {asset_name}: {e}")
 
+    def update_pool(self, pool_name, new_holdings):
+        try:
+            response = requests.post(
+                f"{self.base_url}/api/pool",
+                params={"name": pool_name},
+                json={"holdings": new_holdings}
+            )
+            response.raise_for_status()
+            return response.json()
+        except requests.RequestException as e:
+            print(f"Failed to update pool '{pool_name}': {e}")
+
     def get_market_prices(self, pool):
         """Fetches pending jobs from the /api/jobs endpoint."""
         try:

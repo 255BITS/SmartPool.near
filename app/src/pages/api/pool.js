@@ -36,30 +36,65 @@ const getNearBalance = async (poolId) => {
 };
 
 export default async function handler(req, res) {
+  const { method } = req;
   const { name } = req.query;
 
   if (typeof name !== 'string') {
     return res.status(400).json({ error: 'Invalid name parameter' });
   }
 
-  try {
-    const pool = await PoolService.getOrCreateByName(name);
-    if(!pool.holdings.USDC) {
-      pool.holdings.USDC = {name: "USDC", amount:"0"};
+  if (method === 'GET') {
+    try {
+      const pool = await PoolService.getOrCreateByName(name);
+      if(!pool.holdings.USDC) {
+        pool.holdings.USDC = {name: "USDC", amount:"0"};
+      }
+      if(!pool.holdings["Will the Commanders win Super Bowl 2025?"]) {
+        pool.holdings["Will the Commanders win Super Bowl 2025?"] = {name: "Will the Commanders win Super Bowl 2025?", amount:"10000", cost_basis: "0.001"};
+      }
+      pool.holdings.NEAR = {name: "NEAR", amount: await getNearBalance(name)};
+      pool.estimatedValue = PoolService.getEstimatedValue(pool.holdings);
+      pool.markets = ["https://polymarket.com/event/superbowl-champion-2025?tid=1730165174152"];
+      pool.type = "prediction_market";
+      if(!pool.details) {
+        pool.details = {};
+      }
+      res.status(200).json(pool);
+    } catch (error) {
+      console.error(error);
+      res.status(500).json({ error: 'Error creating or retrieving Pool' });
     }
-    if(!pool.holdings["Will the Commanders win Super Bowl 2025?"]) {
-      pool.holdings["Will the Commanders win Super Bowl 2025?"] = {name: "Will the Commanders win Super Bowl 2025?", amount:"100", cost_basis: "0.001"};
+  } else if (method === 'POST' || method === 'PUT') {
+    try {
+      const { holdings } = req.body;
+
+      if (!holdings || typeof holdings !== 'object') {
+        return res.status(400).json({ error: 'Invalid holdings data' });
+      }
+
+      // Update the pool's holdings
+      let pool = await PoolService.updateHoldings(name, holdings);
+
+      // Update NEAR balance
+      pool.holdings.NEAR = { name: "NEAR", amount: await getNearBalance(name) };
+
+      // Recalculate estimatedValue
+      pool.estimatedValue = PoolService.getEstimatedValue(pool.holdings);
+
+      // Add additional properties
+      pool.markets = ["https://polymarket.com/event/superbowl-champion-2025?tid=1730165174152"];
+      pool.type = "prediction_market";
+      if (!pool.details) {
+        pool.details = {};
+      }
+
+      res.status(200).json(pool);
+    } catch (error) {
+      console.error(error);
+      res.status(500).json({ error: 'Error updating pool holdings' });
     }
-    pool.holdings.NEAR = {name: "NEAR", amount: await getNearBalance(name)};
-    pool.estimatedValue = PoolService.getEstimatedValue(pool.holdings);
-    pool.markets = ["https://polymarket.com/event/superbowl-champion-2025?tid=1730165174152"];
-    pool.type = "prediction_market"
-    if(!pool.details) {
-      pool.details = {};
-    }
-    res.status(200).json(pool);
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Error creating or retrieving Pool' });
+  } else {
+    res.setHeader('Allow', ['GET', 'POST', 'PUT']);
+    res.status(405).end(`Method ${method} Not Allowed`);
   }
 }

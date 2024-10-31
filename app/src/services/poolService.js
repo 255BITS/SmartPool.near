@@ -22,6 +22,14 @@ class PoolService {
     });
   }
 
+  static async updateHoldings(name, holdings) {
+    const pool = await prisma.pool.update({
+      where: { name },
+      data: { holdings },
+    });
+    return pool;
+  }
+
   static getEstimatedValue(holdings) {
     const NEAR_CONVERSION_USD = 5.0; // TODO: Ideally, fetch this dynamically if time permits.
     let totalNEAR = holdings.NEAR.amount;
