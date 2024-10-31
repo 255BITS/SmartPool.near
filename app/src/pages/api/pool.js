@@ -38,6 +38,7 @@ const getNearBalance = async (poolId) => {
 export default async function handler(req, res) {
   const { method } = req;
   const { name } = req.query;
+  const POLY_MARKET = "https://polymarket.com/event/when-will-gpt-5-be-announced?tid=1729566306341";
 
   if (typeof name !== 'string') {
     return res.status(400).json({ error: 'Invalid name parameter' });
@@ -54,7 +55,7 @@ export default async function handler(req, res) {
       }
       pool.holdings.NEAR = {name: "NEAR", amount: await getNearBalance(name)};
       pool.estimatedValue = PoolService.getEstimatedValue(pool.holdings);
-      pool.markets = ["https://polymarket.com/event/superbowl-champion-2025?tid=1730165174152"];
+      pool.markets = [POLY_MARKET];
       pool.type = "prediction_market";
       if(!pool.details) {
         pool.details = {};
@@ -82,7 +83,7 @@ export default async function handler(req, res) {
       pool.estimatedValue = PoolService.getEstimatedValue(pool.holdings);
 
       // Add additional properties
-      pool.markets = ["https://polymarket.com/event/superbowl-champion-2025?tid=1730165174152"];
+      pool.markets = [POLY_MARKET];
       pool.type = "prediction_market";
       if (!pool.details) {
         pool.details = {};
