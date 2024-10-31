@@ -11,6 +11,41 @@ from string import Template
 MODEL = "llama-v3p1-70b-instruct"
 CLOB_ENDPOINT = 'https://clob.polymarket.com'
 
+def send_callback(callback_url, predictions, prediction_market_url, recommended_actions):
+    """
+    Sends a POST request to the callback_url with the specified data.
+    
+    :param callback_url: The URL to send the callback POST request to.
+    :param predictions: Dictionary containing prediction data.
+    :param prediction_market_url: URL string to the prediction market.
+    :param recommended_actions: List of recommended actions.
+    :return: Response data if successful, None otherwise.
+    """
+    if not callback_url:
+        print("Callback URL not set.")
+        return None
+
+    # Prepare the payload
+    payload = {
+        "predictions": predictions,
+        "prediction_market_url": prediction_market_url,
+        "recommended_actions": recommended_actions
+    }
+
+    # Encode the data to JSON format
+    encoded_data = json.dumps(payload).encode('utf-8')
+    headers = {
+        "Content-Type": "application/json"
+    }
+
+    # Create and send the POST request
+    request = urllib.request.Request(callback_url, data=encoded_data, headers=headers, method="POST")
+    
+    with urllib.request.urlopen(request) as response:
+        response_data = response.read().decode('utf-8')
+        print("Response:", response_data)
+        return response_data
+
 def render_template(context):
     """
     Load, render, and write the hardcoded template 'template.html' to 'index.html' with the given context.
@@ -239,9 +274,17 @@ def format_market(event, market):
 
 def main():
     inp = env.list_messages()[-1]["content"]
-    slug = inp
-    if "https:" in inp:
-        parsed_url = urllib.parse.urlparse(inp)
+    if isinstance(inp, str):
+        try:
+            inp = json_lib.loads(inp)
+        except:
+            pass
+
+    if not isinstance(inp, dict):
+        inp = {"url": inp}
+
+    if "https:" in inp["url"]:
+        parsed_url = urllib.parse.urlparse(inp['url'])
         slug = parsed_url.path.split('/')[-1]
 
     data = fetch_and_parse_events(slug)
@@ -311,6 +354,8 @@ Predictions:
     environment_id = globals()['env'].env_vars.get("environmentId", globals()['env'].env_vars.get("environment_id", "")) # this should be set by the app runner
     agent_id = "smartpool.near/prediction-market-assistant/0.0.7"
     render_template({'sys_prompt': sys_prompt, 'prompt': question_prompt, 'predictions':json.dumps(predictions, indent=4),'environment_id':environment_id, 'agent_id':agent_id})
+
+    send_callback(inp.get("callback_url", None), predictions, inp["url"], ["BUY Yes on "+predictions[1][0]])
     env.mark_done()
 
 if __name__ == "__main__":

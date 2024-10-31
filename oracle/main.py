@@ -13,7 +13,7 @@ from decimal import Decimal, ROUND_DOWN
 # Set up PoolApiClient with the AILP URL
 AILP_URL = os.getenv('AILPURL', 'http://localhost:3000')
 NEAR_CONFIG=os.getenv("NEAR_CONFIG", "")
-NEAR_CONFIG_THREAD=os.getenv("NEAR_CONFIG_THREAD", "")
+NEARAI_CALLBACK_URL=os.getenv("NEARAI_CALLBACK_URL", "")
 pool_api = PoolApiClient(AILP_URL)
 
 def fetch_jobs():
@@ -23,58 +23,6 @@ def fetch_jobs():
 def update_job_status(job_id, status, details=None):
     """Updates the job status via the Pool API."""
     pool_api.update_job_status(job_id, status, details)
-
-def near_thread_html(thread_id):
-    base_url = "https://app.near.ai/api/trpc/hub.thread"
-
-    # Encode the `input` parameter with the dynamic thread_id
-    input_param = {
-        "0": {
-            "json": {
-                "threadId": thread_id.decode('utf-8')
-            }
-        }
-    }
-    encoded_input = urllib.parse.quote(json.dumps(input_param))
-
-    # Construct the final URL with batch and encoded input
-    url = f"{base_url}?batch=1&input={encoded_input}"
-
-    headers = {
-        'Content-Type': 'application/json',
-        'Accept': '*/*',
-        'Accept-Encoding': 'gzip, deflate, br, zstd',
-        'Accept-Language': 'en-US,en;q=0.8',
-        'Connection': 'keep-alive',
-        'Referer': 'https://app.near.ai/agents/smartpool.near/prediction-market-assistant/0.0.14/run?threadId=thread_17bba66a1e69449f8d113c25',
-        'Sec-Fetch-Dest': 'empty',
-        'Sec-Fetch-Mode': 'cors',
-        'Sec-Fetch-Site': 'same-origin',
-        'Sec-GPC': '1',
-        'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36',
-        'Authorization': f'Bearer {NEAR_CONFIG_THREAD}',
-        'sec-ch-ua-platform': '"Linux"',
-        'trpc-accept': 'application/jsonl',
-        'x-trpc-source': 'nextjs-react'
-    }
-    print("HEADERS", headers)
-
-    req = urllib.request.Request(url, headers=headers)
-    print("Calling threadurl...", url)
-    htmlresult = None
-    while htmlresult is None:
-        time.sleep(10)
-        with urllib.request.urlopen(req) as response:
-            result = response.read()
-            print("______---")
-            print(result)
-            jsonresult = json.loads(result)
-            htmlresult = find_html_content(jsonresult)
-            print("html")
-            print(htmlresult)
-    return htmlresult
-            
-
 
 # Function to recursively search for 'content' in nested JSON structure
 def find_html_content(data):
@@ -94,7 +42,7 @@ def find_html_content(data):
                 return result
     return None
 
-def call_near_ai_api(prediction_market_url, liquid_usdc, holdings):
+def call_near_ai_api(prediction_market_url, usdc_available, holdings):
     url = "https://api.near.ai/v1/agent/runs"
     print("NEAR_C", NEAR_CONFIG)
     headers = {
@@ -103,10 +51,15 @@ def call_near_ai_api(prediction_market_url, liquid_usdc, holdings):
     }
     new_message = {
         "prediction_market_url": prediction_market_url,
-        "liquid_usdc": liquid_usdc,
+        "usdc_available": usdc_available,
         "holdings": holdings
     }
-    new_message = prediction_market_url
+    new_message = {
+        "url": prediction_market_url,
+        "callback_url": NEARAI_CALLBACK_URL,
+        "holdings": holdings,
+        "usdc_available": usdc_available
+    }
 
     payload = json.dumps({
         "agent_id": "smartpool.near/prediction-market-assistant/0.0.14",
@@ -121,7 +74,7 @@ def call_near_ai_api(prediction_market_url, liquid_usdc, holdings):
             result = response.read()
             print("RESULT")
             print(result)
-            return near_thread_html(result)
+            return result.decode("utf-8")
     except Exception as e:
         print(f"Error calling NEAR AI API: {e}")
         return None
