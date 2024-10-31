@@ -66,7 +66,7 @@ python3 oracle/main.py
 
 #### Environment Variables
 
-- `AILPURL`: URL for the Pool API Client.
+- `SMARTPOOL_URL`: URL for the Pool API Client.
 - `NEAR_CONFIG`: Configuration for NEARAI authorization. See nearai for details.
 - `NEARAI_CALLBACK_URL`: Callback URL for NEAR AI integration.
 
