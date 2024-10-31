@@ -39,6 +39,7 @@ export default async function handler(req, res) {
   const { method } = req;
   const { name } = req.query;
   const POLY_MARKET = "https://polymarket.com/event/when-will-gpt-5-be-announced?tid=1729566306341";
+  const POLY_QUESTION = "GPT-5 not announced in 2024?"
 
   if (typeof name !== 'string') {
     return res.status(400).json({ error: 'Invalid name parameter' });
@@ -50,8 +51,8 @@ export default async function handler(req, res) {
       if(!pool.holdings.USDC) {
         pool.holdings.USDC = {name: "USDC", amount:"0"};
       }
-      if(!pool.holdings["Will the Commanders win Super Bowl 2025?"]) {
-        pool.holdings["Will the Commanders win Super Bowl 2025?"] = {name: "Will the Commanders win Super Bowl 2025?", amount:"10000", cost_basis: "0.001"};
+      if(!pool.holdings[POLY_QUESTION]) {
+        pool.holdings[POLY_QUESTION] = {name: POLY_QUESTION, amount:"10000", cost_basis: "0.1"};
       }
       pool.holdings.NEAR = {name: "NEAR", amount: await getNearBalance(name)};
       pool.estimatedValue = PoolService.getEstimatedValue(pool.holdings);
