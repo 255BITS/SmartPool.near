@@ -63,7 +63,7 @@ def call_near_ai_api(pool_name, prediction_market_url, usdc_available, holdings)
     }
 
     payload = json.dumps({
-        "agent_id": "smartpool.near/prediction-market-assistant/0.1.0",
+        "agent_id": "smartpool.near/prediction-market-assistant/0.1.1",
         "new_message": json.dumps(new_message),
         "max_iterations": 1
     }).encode("utf-8")
