@@ -35,7 +35,7 @@ def get_ecr_uri():
 def ecr_login(manager, key, ecr_uri):
     """Logs into AWS ECR on the remote manager node."""
     get_login_password_cmd = "aws ecr get-login-password --region us-west-2"
-    docker_login_cmd = f"{get_login_password_cmd} | docker login --username AWS --password-stdin {ecr_uri}"
+    docker_login_cmd = f"{get_login_password_cmd} | sudo docker login --username AWS --password-stdin {ecr_uri}"
     ssh_command = f"ssh -i {key} {manager} '{docker_login_cmd}'"
     subprocess.check_call(ssh_command, shell=True)
 
@@ -53,7 +53,7 @@ def sync_files(project, manager, key):
     subprocess.check_call(['rsync', '-avz', '-e', f'ssh -i {key}', f'./secrets/{project}.yml', f'{manager}:~/'])
 
 def deploy_stack(project, manager, key):
-    deploy_command = f'docker stack deploy --compose-file ~/{project}.yml --with-registry-auth {project} --resolve-image always'
+    deploy_command = f'sudo docker stack deploy --compose-file ~/{project}.yml --with-registry-auth {project} --resolve-image always'
     ssh_command = f'ssh -i {key} {manager} \"{deploy_command}\"'
     subprocess.check_call(ssh_command, shell=True)
 
