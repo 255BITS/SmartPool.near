@@ -81,3 +81,7 @@ npm run dev
 ### Smart Contract
 
 Build with cargo.
+
+
+# License
+MIT
