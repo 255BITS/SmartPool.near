@@ -42,7 +42,7 @@ def find_html_content(data):
                 return result
     return None
 
-def call_near_ai_api(prediction_market_url, usdc_available, holdings):
+def call_near_ai_api(pool_name, prediction_market_url, usdc_available, holdings):
     url = "https://api.near.ai/v1/agent/runs"
     print("NEAR_C", NEAR_CONFIG)
     headers = {
@@ -56,6 +56,7 @@ def call_near_ai_api(prediction_market_url, usdc_available, holdings):
     }
     new_message = {
         "url": prediction_market_url,
+        "pool_name": pool_name,
         "callback_url": NEARAI_CALLBACK_URL,
         "holdings": holdings,
         "usdc_available": usdc_available
@@ -83,7 +84,7 @@ def runAI(pool):
     # TODO needs current prices
     print("--", pool)
     holdings = pool["holdings"]
-    response = call_near_ai_api("https://polymarket.com/event/when-will-gpt-5-be-announced?tid=1729566306341", 0, {})
+    response = call_near_ai_api(pool.name, "https://polymarket.com/event/when-will-gpt-5-be-announced?tid=1729566306341", 0, {})
     print("___", response)
     return {"operation": "BUY"}, "http://fake url"
 
@@ -102,23 +103,23 @@ async def process_job(job):
     print("--", job)
 
     try:
-        if action == 'BUY':
-            tokens_bought, fees = handle_buy(details['user_id'], float(details['amount']))
-            details = {
-                "action": "BUY",
-                "tokens_bought": tokens_bought,
-                "fees": fees,
-            }
-            print(f"BUY processed: {tokens_bought} tokens bought with {fees} fees")
+        if action == 'buy':
+            pool_api.record_action(
+                pool_name,
+                "BUY",
+                "NEAR AI",
+                details={
+                }
+            )
         
-        elif action == 'SELL':
-            usdc_received, fees = handle_sell(details['user_id'], float(details['amount']))
-            details = {
-                "action": "SELL",
-                "usdc_received": usdc_received,
-                "fees": fees,
-            }
-            print(f"SELL processed: {usdc_received} USDC received with {fees} fees")
+        elif action == 'sell':
+            pool_api.record_action(
+                pool_name,
+                "SELL",
+                "NEAR AI",
+                details={
+                }
+            )
 
         elif action == 'runAI':
             pool = pool_api.get_pool(pool_name)
@@ -135,24 +136,8 @@ async def process_job(job):
 
             if ai_action["operation"] == "BUY":
                 print("Should BUY here", ai_action)
-                pool_api.record_action(
-                    pool_name,
-                    "BUY",
-                    "NEAR AI",
-                    details={
-                        "ai_action": ai_action,
-                    }
-                )
             elif ai_action["operation"] == "SELL":
                 print("Should SELL here", ai_action)
-                pool_api.record_action(
-                    pool_name,
-                    "SELL",
-                    "NEAR AI",
-                    details={
-                        "ai_action": ai_action,
-                    }
-                )
 
             print(f"NEAR AI run executed")
 

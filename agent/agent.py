@@ -11,14 +11,15 @@ from string import Template
 MODEL = "llama-v3p1-70b-instruct"
 CLOB_ENDPOINT = 'https://clob.polymarket.com'
 
-def send_callback(callback_url, predictions, prediction_market_url, recommended_actions):
+def send_callback(pool_name, callback_url, predictions, prediction_market_url, recommended_action, choice):
     """
     Sends a POST request to the callback_url with the specified data.
     
     :param callback_url: The URL to send the callback POST request to.
     :param predictions: Dictionary containing prediction data.
     :param prediction_market_url: URL string to the prediction market.
-    :param recommended_actions: List of recommended actions.
+    :param recommended_action: buy or sell
+    :param choice: question and vote (yes or no)
     :return: Response data if successful, None otherwise.
     """
     if not callback_url:
@@ -27,9 +28,12 @@ def send_callback(callback_url, predictions, prediction_market_url, recommended_
 
     # Prepare the payload
     payload = {
-        "predictions": predictions,
-        "prediction_market_url": prediction_market_url,
-        "recommended_actions": recommended_actions
+        "payload": {
+            "predictions": predictions,
+            "prediction_market_url": prediction_market_url,
+        },
+        "poolName": pool_name,
+        "jobType": recommended_action,
     }
 
     # Encode the data to JSON format
@@ -355,7 +359,7 @@ Predictions:
     agent_id = "smartpool.near/prediction-market-assistant/0.0.7"
     render_template({'sys_prompt': sys_prompt, 'prompt': question_prompt, 'predictions':json.dumps(predictions, indent=4),'environment_id':environment_id, 'agent_id':agent_id})
 
-    send_callback(inp.get("callback_url", None), predictions, inp["url"], ["BUY Yes on "+predictions[1][0]])
+    send_callback(inp.get("pool_name", None), inp.get("callback_url", None), predictions, inp["url"], "buy", ["yes", predictions[1][0]])
     env.mark_done()
 
 if __name__ == "__main__":

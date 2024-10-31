@@ -14,6 +14,14 @@ export default function handler(req, res) {
 
   // Switch based on job type
   switch (jobType) {
+    case 'buy':
+      createJob('buy', payload, poolName);
+      res.status(200).json({ status: 'Job queued: buy' });
+      break;
+    case 'sell':
+      createJob('sell', payload, poolName);
+      res.status(200).json({ status: 'Job queued: sell' });
+      break;
     case 'runAI':
       // Queue up the AI job
       runAIJob(payload, poolName);
