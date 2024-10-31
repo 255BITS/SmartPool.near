@@ -9,8 +9,9 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start",
+    "start": "next start -p 8254",
     "test": "ava",
+    "migrate": "npx prisma migrate deploy",
     "lint": "next lint"
   },
   "dependencies": {
