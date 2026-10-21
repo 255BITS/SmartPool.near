@@ -1,5 +1,15 @@
+# Shared trust stage: dependency downloads AND the final runtime need the fix.
+# Alpine's 2026-10-20 update removes the compromised emSign/AAA root paths.
+FROM node:22-alpine3.23 AS trusted
+RUN apk add --no-cache 'ca-certificates>=20261020-r0' && update-ca-certificates
+ENV NODE_OPTIONS="--use-openssl-ca" \
+    SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt \
+    SSL_CERT_DIR=/etc/ssl/certs \
+    npm_config_cafile=/etc/ssl/certs/ca-certificates.crt \
+    npm_config_strict_ssl=true
+
 # Stage 1: Build the app
-FROM node:18-alpine AS builder
+FROM trusted AS builder
 
 WORKDIR /app
 
@@ -23,7 +33,7 @@ RUN npx prisma generate
 RUN npm prune --production
 
 # Stage 2: Create the production image
-FROM node:18-alpine
+FROM trusted
 
 WORKDIR /app
 
