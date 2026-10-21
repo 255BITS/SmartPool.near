@@ -93,8 +93,10 @@ affects outbound server requests to NEAR RPC, Polymarket and other HTTPS APIs.
 The deployed Next.js service runs directly on Netcup; its trust policy is owned
 by [255labs infrastructure](https://github.com/255BITS/deploy/tree/master/255labs).
 Install that host prerequisite **before merging this PR**: the main-branch workflow
-immediately deploys the app. Restart `smartpool` after installing its reviewed
-service mirror. The launcher preserves existing `NODE_OPTIONS` and adds
+normally deploys the app. The 2026-10-21 live audit found `smartpool` disabled
+and inactive. Keep it parked: the updated deployment entrypoint refuses to revive
+it automatically, and reactivation requires a separate operator decision. Install
+its reviewed service mirror while preserving that state. The launcher preserves existing `NODE_OPTIONS` and adds
 `--use-openssl-ca`, with the patched system bundle selected explicitly.
 
 For the alternative Docker deployment, both image stages now inherit Alpine
@@ -122,3 +124,11 @@ incident probes, including AAA cross-signs. Check the app's read-only market and
 RPC requests without submitting a transaction. Update operators' browsers and
 wallet clients separately. Updating this source does not establish that any
 of those production checks have passed.
+
+The [2026-10-21 Node security release](https://nodejs.org/en/blog/vulnerability/october-2026-security-releases)
+includes a native CA fix in Node 22.23.4. Its `22.23.4-alpine3.23` Docker tag was
+not published when checked, so the tested image remains Node 22.23.3 with the
+patched exclusive OS store. Move to a buildable native-fixed tag once published
+for the required platform, then repeat the TLS/fetch gates. Do not substitute an
+unavailable image tag. The parked Netcup service's system Node 20.19.2 needs a
+supported-runtime decision before any separately authorized reactivation.
