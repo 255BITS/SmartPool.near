@@ -3,3 +3,5 @@ requests
 base58
 loguru
 pydantic
+# eMudhra compromise: Requests/HTTP clients must not use older bundled roots.
+certifi>=2026.10.19

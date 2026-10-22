@@ -85,3 +85,51 @@ Build with cargo.
 
 # License
 MIT
+
+## TLS trust maintenance (2026-10-21)
+
+The [eMudhra intermediate-key compromise](https://emudhra.we-have-a-problem.com/)
+affects outbound server requests to NEAR RPC, Polymarket and other HTTPS APIs.
+The deployed Next.js service runs directly on Netcup; its trust policy is owned
+by [255labs infrastructure](https://github.com/255BITS/deploy/tree/master/255labs).
+Install that host prerequisite **before merging this PR**: the main-branch workflow
+normally deploys the app. The 2026-10-21 live audit found `smartpool` disabled
+and inactive. Keep it parked: the updated deployment entrypoint refuses to revive
+it automatically, and reactivation requires a separate operator decision. Install
+its reviewed service mirror while preserving that state. The launcher preserves existing `NODE_OPTIONS` and adds
+`--use-openssl-ca`, with the patched system bundle selected explicitly.
+
+For the alternative Docker deployment, both image stages now inherit Alpine
+`ca-certificates >= 20261020-r0` and exclusive OpenSSL trust. Rebuild with
+`docker build --pull --no-cache -t smartpool:tls-fixed app`; the previous image's
+filesystem does not inherit a host CA update. Node 22 replaces the unsupported
+Node 18 base. Validate migrations, Prisma and the Next build in staging before
+using this alternative deployment. Preserve other `NODE_OPTIONS` if overriding
+the container environment; retain `--use-openssl-ca`. `--use-system-ca` and
+`NODE_EXTRA_CA_CERTS` add roots and cannot remove compromised bundled trust.
+
+The `oracle/` Python client is a separate runtime: update its host CA package
+first, then install `oracle/requirements.txt` using that patched bundle, e.g.
+`PIP_CERT=/etc/ssl/certs/ca-certificates.crt python -m pip install -r oracle/requirements.txt`.
+It now requires `certifi >= 2026.10.19`. Restart any independently hosted oracle
+and test its actual interpreter; the Netcup app inventory does not include an
+oracle service. The `agent/` code uses Python `urllib` inside the NEAR AI hosted
+agent environment: that provider/operator must patch its OS trust store and
+restart the agent separately. A Next.js redeploy cannot update those clients.
+
+Before closing the rollout, use the infrastructure `tools/check-tls-trust.py`
+against the deployed Node interpreter and each oracle/hosted-agent interpreter.
+Require successful ordinary HTTPS and certificate failures for all twelve
+incident probes, including AAA cross-signs. Check the app's read-only market and
+RPC requests without submitting a transaction. Update operators' browsers and
+wallet clients separately. Updating this source does not establish that any
+of those production checks have passed.
+
+The [2026-10-21 Node security release](https://nodejs.org/en/blog/vulnerability/october-2026-security-releases)
+includes a native CA fix in Node 22.23.4. As of 2026-10-22 its
+`22.23.4-alpine3.23` image is published for Linux amd64 and arm64. The alternative
+Dockerfile pins that native-fixed multi-platform image by digest and retains
+exclusive patched OS trust. This prepares the image source; it does not activate
+Netcup or a separate oracle/hosted agent. The parked Netcup service's system Node
+20.19.2 still needs a supported-runtime decision before any separately authorized
+reactivation.
