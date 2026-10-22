@@ -126,9 +126,10 @@ wallet clients separately. Updating this source does not establish that any
 of those production checks have passed.
 
 The [2026-10-21 Node security release](https://nodejs.org/en/blog/vulnerability/october-2026-security-releases)
-includes a native CA fix in Node 22.23.4. Its `22.23.4-alpine3.23` Docker tag was
-not published when checked, so the tested image remains Node 22.23.3 with the
-patched exclusive OS store. Move to a buildable native-fixed tag once published
-for the required platform, then repeat the TLS/fetch gates. Do not substitute an
-unavailable image tag. The parked Netcup service's system Node 20.19.2 needs a
-supported-runtime decision before any separately authorized reactivation.
+includes a native CA fix in Node 22.23.4. As of 2026-10-22 its
+`22.23.4-alpine3.23` image is published for Linux amd64 and arm64. The alternative
+Dockerfile pins that native-fixed multi-platform image by digest and retains
+exclusive patched OS trust. This prepares the image source; it does not activate
+Netcup or a separate oracle/hosted agent. The parked Netcup service's system Node
+20.19.2 still needs a supported-runtime decision before any separately authorized
+reactivation.

@@ -1,6 +1,6 @@
 # Shared trust stage: dependency downloads AND the final runtime need the fix.
 # Alpine's 2026-10-20 update removes the compromised emSign/AAA root paths.
-FROM node:22-alpine3.23 AS trusted
+FROM node:22.23.4-alpine3.23@sha256:6abbcf5dd6b231da109bcde1181db1d92bf78015ae1a9514d9807c1f857869db AS trusted
 RUN apk add --no-cache 'ca-certificates>=20261020-r0' && update-ca-certificates
 ENV NODE_OPTIONS="--use-openssl-ca" \
     SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt \
